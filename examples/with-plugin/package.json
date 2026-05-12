@@ -1,0 +1,22 @@
+{
+  "name": "riftexpress-example-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Demonstrates the RiftExpress plugin system: register, hooks, decorators, and the module-augmentation pattern.",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "riftexpress": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "@types/node": "^22.5.0",
+    "typescript": "^5.6.0"
+  }
+}

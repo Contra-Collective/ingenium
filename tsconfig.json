@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "riftexpress": ["./packages/riftexpress/src/index.ts"],
+      "riftexpress/*": ["./packages/riftexpress/src/*"],
+      "riftexpress-compat": ["./packages/riftexpress-compat/src/index.ts"],
+      "riftexpress-bun": ["./packages/riftexpress-bun/src/index.ts"],
+      "riftexpress-cli": ["./packages/riftexpress-cli/src/cli.ts"]
+    }
+  },
+  "include": [
+    "packages/riftexpress/src/**/*",
+    "packages/riftexpress/test/**/*",
+    "packages/riftexpress-compat/src/**/*",
+    "packages/riftexpress-compat/test/**/*",
+    "packages/riftexpress-bun/src/**/*",
+    "packages/riftexpress-bun/test/**/*",
+    "packages/riftexpress-cli/src/**/*",
+    "packages/riftexpress-cli/test/**/*"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "riftexpress-example-migration",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Side-by-side Express vs RiftExpress server demonstrating migration.",
+  "scripts": {
+    "express": "tsx express-version.ts",
+    "riftexpress": "tsx riftexpress-version.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "riftexpress": "*"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

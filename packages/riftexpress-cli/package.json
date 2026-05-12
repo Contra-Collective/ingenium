@@ -1,0 +1,30 @@
+{
+  "name": "riftexpress-cli",
+  "version": "0.0.1",
+  "description": "Project scaffolder CLI for RiftExpress.",
+  "type": "module",
+  "bin": {
+    "rex": "./bin/rex.mjs"
+  },
+  "main": "./src/cli.ts",
+  "exports": {
+    ".": {
+      "types": "./src/cli.ts",
+      "import": "./src/cli.ts"
+    }
+  },
+  "files": ["src", "bin"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": ["riftexpress", "cli", "scaffold", "generator"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "vitest": "^2.0.0"
+  }
+}

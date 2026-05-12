@@ -1,0 +1,58 @@
+name: Dependency Audit
+
+on:
+  push:
+    branches:
+      - "**"
+  schedule:
+    # Weekly on Mondays at 07:00 UTC
+    - cron: "0 7 * * 1"
+
+jobs:
+  banned-packages:
+    name: Banned package check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Scan for banned packages
+        shell: bash
+        run: |
+          set -u
+          # Banned package list (see CLAUDE.md). Match across manifests + lockfile.
+          PATTERN='@tanstack/router|@tanstack/react-router|@tanstack/router-core|@tanstack/router-utils|@tanstack/start|@opensearch-project/opensearch|@mistralai/mistralai|@uipath/|@squawk/'
+
+          FILES=(
+            "package.json"
+            "package-lock.json"
+            "benchmarks/package.json"
+          )
+          # Discover workspace + example manifests dynamically
+          for f in packages/*/package.json examples/*/package.json; do
+            [ -f "$f" ] && FILES+=("$f")
+          done
+
+          fail=0
+          for f in "${FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "skip (missing): $f"
+              continue
+            fi
+            if grep -E -n "$PATTERN" "$f" > /dev/null; then
+              echo "::error file=$f::Banned package reference found in $f"
+              grep -E -n "$PATTERN" "$f" || true
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Banned package(s) detected. Failing build."
+            exit 1
+          fi
+          echo "OK: no banned packages found."
