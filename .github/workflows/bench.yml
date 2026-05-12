@@ -44,7 +44,7 @@ jobs:
           } | tee bench-output.txt
 
       - name: Upload bench output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-output
           path: benchmarks/bench-output.txt
