@@ -19,39 +19,14 @@
 
 ---
 
-## Performance — current honest numbers
+## Performance
 
-Reproduce: `npm install` then `npx tsx scenarios/v2/hello.ts` (and `body.ts`,
-`middleware.ts`) inside `benchmarks/`. **Separate Node child processes per
-framework, 5 samples + warmup, autocannon `-c 100 -d 5`, Node 24.12 on a
-Windows dev machine.**
-
-| Scenario               | Express | Fastify | Hono   | **RiftExpress** | vs Express |
-|------------------------|---------|---------|--------|-----------------|------------|
-| hello (`GET /` JSON)   | 14,691  | 30,162  | 22,131 | **31,221**      | **2.13×**  |
-| body-json (POST echo)  | 17,352  | 14,871  | 10,062 | **27,726**      | **1.60×**  |
-| middleware-stack (10×) | 24,015  | 23,531  | 24,327 | **31,081**      | **1.29×**  |
-
-(rps mean across 5 samples)
-
-RiftExpress is the **fastest of the four** in all three scenarios on this
-machine. We did not hit the original 4× hello-world target, but the
-"competitive with Hono and Fastify" bar — the actual hard goal — is met,
-and slightly exceeded.
-
-Caveats (read these before quoting the numbers anywhere):
-
-- Single dev machine, no CPU pinning, no thermal control, Windows.
-- One run per scenario (5 samples is small).
-- Framework versions: Express `^4.21`, Fastify `^5.0`, Hono `^4.6` — pinned in
-  `benchmarks/package.json` but not minor-locked.
-- Hono's body-json number looks low for Hono — possibly `@hono/node-server`
-  overhead or unfair config; investigate before publishing.
-- Bun adapter not benchmarked yet (no Bun on the test machine).
-
-The "local regression detector" framing in `benchmarks/README.md` still applies.
-For publishable claims, isolated hardware + many runs + pinned versions are
-required.
+We do not publish benchmark numbers in this repo. Run the local harness in
+`benchmarks/scenarios/v2/` against your own hardware and workload — those
+results are what matter for your decision. Publishable comparative numbers
+require isolated hardware, CPU pinning, multi-run / std-dev aggregation, and
+pinned framework versions; the bench scripts here are regression detectors
+during development, not marketing material.
 
 ---
 

@@ -3,11 +3,12 @@
 > Express ergonomics, Hono/Fastify-class throughput. A typed HTTP framework for Node 20+ and Bun 1.1+.
 
 ```
-                      __  ______
-   _____  _  __     /   |/_  __/ ___  _  ____  ____   ___  _____ _____
-  / ___/ | |/_/    / /| | / /  / _ \| |/_/ _ \/ ___/ / _ \/ ___// ___/
- / /     |>  <    / ___ |/ /  /  __/>  </ __/ /     /  __(__  )(__  )
-/_/    /_/|_|   /_/  |_/_/   \___/_/|_|\___/_/      \___/____//____/
+  ____  _  __ _   _____                              
+ |  _ \(_)/ _| |_| ____|_  ___ __  _ __ ___  ___ ___ 
+ | |_) | | |_| __|  _| \ \/ / '_ \| '__/ _ \/ __/ __|
+ |  _ <| |  _| |_| |___ >  <| |_) | | |  __/\__ \__ \
+ |_| \_\_|_|  \__|_____/_/\_\ .__/|_|  \___||___/___/
+                             |_|                     
 ```
 
 RiftExpress is what happens if you fix Express's three structural problems — linear routing, untyped `req`/`res`, and per-request allocation — without forcing developers to learn a new mental model. It's the same shape (`app.get`, `app.use`, mountable routers, drop-in middleware), with a typed `ctx` instead of `(req, res, next)`, and a router/dispatcher built for current-decade Node throughput.
@@ -20,7 +21,6 @@ RiftExpress is what happens if you fix Express's three structural problems — l
 
 - [Show me the code](#show-me-the-code)
 - [Why RiftExpress](#why-riftexpress)
-- [Performance](#performance)
 - [Install](#install)
 - [The 5-minute Express → RiftExpress diff](#the-5-minute-express--riftexpress-diff)
 - [Core concepts](#core-concepts)
@@ -100,38 +100,6 @@ That's a full server. No `res.send`. No `body-parser`. No `app.set('case sensiti
 | Migration cost from Express | n/a | high | low |
 
 The pitch in one sentence: **the shortest path from a working Express app to throughput competitive with Hono and Fastify.**
-
----
-
-## Performance
-
-Honest framing — separate Node child processes per framework, 5 samples + warmup, autocannon `-c 100 -d 5`, Node 24 on a Windows dev machine. Mean requests/sec:
-
-| Scenario               | Express | Fastify | Hono   | **RiftExpress** | vs Express |
-|------------------------|---------|---------|--------|-----------------|------------|
-| `GET /` returning JSON | 14,691  | 30,162  | 22,131 | **31,221**      | **2.13×**  |
-| `POST /echo` JSON body | 17,352  | 14,871  | 10,062 | **27,726**      | **1.60×**  |
-| 10-middleware stack    | 24,015  | 23,531  | 24,327 | **31,081**      | **1.29×**  |
-
-RiftExpress is the fastest of the four in all three scenarios on this machine.
-
-**Caveats** (read these before quoting numbers):
-- Single dev machine, no CPU pinning, no thermal control.
-- One run series per scenario (5 samples).
-- Framework versions: Express `^4.21`, Fastify `^5.0`, Hono `^4.6` — pinned in `benchmarks/package.json` but not minor-locked.
-- Hono's body-json number is suspiciously low. Investigate before publishing publicly.
-- Bun adapter not benchmarked yet.
-
-For publishable numbers you need isolated hardware + many runs + pinned versions. The benchmarks here are local regression detectors.
-
-Reproduce on your hardware:
-
-```sh
-cd benchmarks
-npx tsx scenarios/v2/hello.ts
-npx tsx scenarios/v2/body.ts
-npx tsx scenarios/v2/middleware.ts
-```
 
 ---
 
@@ -858,8 +826,6 @@ See [docs/roadmap.md](docs/roadmap.md) for the full breakdown. Highlights:
 - CI matrix, ADRs, reference app, governance bundle
 
 **Known issues:**
-- Hono's body-json benchmark number looks low; investigate before publishing public comparisons
-- Bun adapter not benchmarked yet (no Bun on the bench machine)
 - Compat shim long-tail: middleware that own `res.end` (compression, express-session) silently misbehave — documented but worth surfacing better
 - `ctx.query.parse(schema)` doesn't exist yet — only body validation has the schema affordance
 - `ExtractParams` doesn't narrow constrained params (`:id(\\d+)` stays `string`)
@@ -867,7 +833,6 @@ See [docs/roadmap.md](docs/roadmap.md) for the full breakdown. Highlights:
 - HEAD requests on static files fall through to `next()` instead of returning headers-only
 
 **Deferred to next session:**
-- Full benchmark matrix on CI hardware with pinned versions
 - Native rate-limit Redis store
 - Plugin scoping (Fastify-style sub-app affinity)
 - TypeBox-specific bridge (Standard Schema covers it but a tighter integration could be cleaner)
