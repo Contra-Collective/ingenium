@@ -162,8 +162,15 @@ function populateContext(ctx: RiftexContext, req: Request, maxRequestBytes: numb
     ctx.method === 'GET' ||
     ctx.method === 'HEAD' ||
     ctx.method === 'OPTIONS'
+  // Skip the byte-limit Transform when Content-Length is declared and within
+  // cap — the pre-check already verified, and the WinterCG stream is bounded
+  // by the declared length.
+  const knownSafe =
+    contentLength !== undefined &&
+    Number.isFinite(contentLength) &&
+    contentLength <= maxRequestBytes
   let source = noBody || !req.body ? null : webStreamToNodeReadable(req.body)
-  if (source && Number.isFinite(maxRequestBytes)) {
+  if (source && Number.isFinite(maxRequestBytes) && !knownSafe) {
     source = source.pipe(createByteLimit(maxRequestBytes))
   }
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)

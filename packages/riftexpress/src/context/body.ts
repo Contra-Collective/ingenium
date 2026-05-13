@@ -86,13 +86,14 @@ export class RiftexBody {
     return this._source
   }
 
-  /** Buffers the entire body into a `Buffer`. Honors `maxBytes` (default 1 MiB). */
+  /** Buffers the entire body into a `Buffer`. Honors `maxBytes` (default 100KB). */
   async buffer(maxBytes: number = DEFAULT_MAX_BYTES): Promise<Buffer> {
     if (this._consumed) throw new RiftexBadRequestError('Request body already consumed')
     if (!this._source) return Buffer.alloc(0)
     this._consumed = true
 
-    if (this._contentLength !== undefined && this._contentLength > maxBytes) {
+    const cl = this._contentLength
+    if (cl !== undefined && cl > maxBytes) {
       // Drain source so the connection can be reused.
       this._source.resume()
       throw new (await import('../errors.ts')).RiftexPayloadTooLargeError(
@@ -100,7 +101,43 @@ export class RiftexBody {
       )
     }
 
-    const limited = this._source.pipe(createByteLimit(maxBytes))
+    const source = this._source
+
+    // Fast path: Content-Length is known and within cap. Pre-allocate exactly
+    // one Buffer and copy chunks directly into it — eliminates the chunks[]
+    // array, the per-chunk push, and the final Buffer.concat copy. Same
+    // observable behavior, ~2-3 fewer allocations per request, and a single
+    // contiguous write instead of a copy-then-walk.
+    //
+    // The transport-layer Transform may already be installed; that's fine —
+    // it just no-ops for in-bounds bodies. We do not install a second one
+    // here when we know the length (the transport already enforced).
+    if (cl !== undefined && cl >= 0) {
+      const buf = Buffer.allocUnsafe(cl)
+      let offset = 0
+      return new Promise<Buffer>((resolve, reject) => {
+        source.on('data', (chunk: Buffer) => {
+          // Defensive: clamp to declared length so a misbehaving stream
+          // can't write past our pre-allocated buffer. (`node:http` itself
+          // already enforces Content-Length, so this is belt + suspenders.)
+          const remaining = cl - offset
+          if (remaining <= 0) return
+          const n = chunk.length <= remaining ? chunk.length : remaining
+          chunk.copy(buf, offset, 0, n)
+          offset += n
+        })
+        source.on('end', () => {
+          // If the client truncated, return the partial buffer (matches the
+          // chunks-then-concat path's behavior pre-optimization).
+          resolve(offset === cl ? buf : buf.subarray(0, offset))
+        })
+        source.on('error', reject)
+      })
+    }
+
+    // Unknown length (chunked encoding, no Content-Length) — fall back to
+    // the chunks + Buffer.concat path with the byte-limit Transform on top.
+    const limited = source.pipe(createByteLimit(maxBytes))
     const chunks: Buffer[] = []
     return new Promise<Buffer>((resolve, reject) => {
       limited.on('data', (chunk: Buffer) => chunks.push(chunk))
@@ -112,7 +149,7 @@ export class RiftexBody {
   /** Buffers the body and decodes as UTF-8 text. */
   async text(maxBytes?: number): Promise<string> {
     const buf = await this.buffer(maxBytes)
-    return buf.toString('utf8')
+    return buf.length === 0 ? '' : buf.toString('utf8')
   }
 
   /**
@@ -130,7 +167,10 @@ export class RiftexBody {
     schema?: StandardSchemaV1<unknown, T> | SafeParseSchema<T> | ParseSchema<T>,
     maxBytes?: number,
   ): Promise<T> {
-    const text = await this.text(maxBytes)
+    // Inline `text()` to skip one async indirection (one microtask saved
+    // per ctx.body.json() call). Same observable behavior.
+    const buf = await this.buffer(maxBytes)
+    const text = buf.length === 0 ? '' : buf.toString('utf8')
     let parsed: unknown
     try {
       parsed = text.length === 0 ? null : JSON.parse(text)

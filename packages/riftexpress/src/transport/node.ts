@@ -163,51 +163,72 @@ function populateContext(ctx: RiftexContext, req: IncomingMessage, maxRequestByt
   const contentLength = cl ? Number(cl) : undefined
   const ct = req.headers['content-type']
   // Wrap the raw IncomingMessage in a transport-level byte-limit so the cap
-  // applies to EVERY consumer, including `ctx.body.stream()`. Skip the wrap
-  // when the cap is disabled (Infinity) OR when the request is structurally
-  // body-less (GET/HEAD/OPTIONS or explicit Content-Length: 0). The Transform
-  // is the single biggest per-request overhead on hot read endpoints; not
-  // installing it for body-less methods clawed back ~10-15% of hello-rps.
+  // applies to EVERY consumer, including `ctx.body.stream()`. We skip the
+  // wrap in three provably-safe cases:
+  //
+  //   1. The request is structurally body-less (GET/HEAD/OPTIONS or
+  //      Content-Length: 0). No body to cap.
+  //   2. The cap is disabled (Number.POSITIVE_INFINITY).
+  //   3. Content-Length is declared AND ≤ cap. The pre-check
+  //      (`rejectIfContentLengthTooBig`) already verified this; node:http
+  //      itself enforces the declared length and stops reading at the
+  //      byte count, so the body cannot exceed the cap. The Transform
+  //      would be redundant defense in this path.
+  //
+  // Chunked encoding (no Content-Length) keeps the Transform — that's
+  // where the cap actually matters, because the client controls the
+  // stream length without any prior declaration.
   const noBody =
     contentLength === 0 ||
     ctx.method === 'GET' ||
     ctx.method === 'HEAD' ||
     ctx.method === 'OPTIONS'
+  const knownSafe =
+    contentLength !== undefined &&
+    Number.isFinite(contentLength) &&
+    contentLength <= maxRequestBytes
   const source =
-    noBody || !Number.isFinite(maxRequestBytes)
+    noBody || !Number.isFinite(maxRequestBytes) || knownSafe
       ? req
       : req.pipe(createByteLimit(maxRequestBytes))
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
 function writeResponse(ctx: RiftexContext, res: ServerResponse): void {
-  res.statusCode = ctx._statusCode
-
-  for (const name in ctx._headers) {
-    const value = ctx._headers[name]
-    if (value !== undefined) res.setHeader(name, value)
-  }
-
   const body = ctx._body
+  const headers = ctx._headers
+
+  // Compute content-length where we know it. Mutating ctx._headers is safe
+  // because the context is being released to the pool right after this call.
   switch (body.kind) {
-    case 'none':
-      res.end()
-      break
     case 'string':
-      // Set content-length when we know it; lets keep-alive reuse the connection.
-      if (!res.hasHeader('content-length')) {
-        res.setHeader('content-length', Buffer.byteLength(body.data))
+      if (headers['content-length'] === undefined) {
+        headers['content-length'] = String(Buffer.byteLength(body.data))
       }
-      res.end(body.data)
       break
     case 'buffer':
-      if (!res.hasHeader('content-length')) {
-        res.setHeader('content-length', body.data.length)
+      if (headers['content-length'] === undefined) {
+        headers['content-length'] = String(body.data.length)
       }
-      res.end(body.data)
       break
+    case 'none':
     case 'stream':
-      body.data.pipe(res)
       break
+  }
+
+  // Single writeHead call instead of `statusCode = ...; setHeader × N`.
+  // node:http has a fast path that flushes status line + headers in one
+  // serialization pass — measurably faster than the per-header setHeader
+  // sequence on hot endpoints.
+  if (body.kind === 'stream') {
+    res.writeHead(ctx._statusCode, headers)
+    body.data.pipe(res)
+    return
+  }
+  res.writeHead(ctx._statusCode, headers)
+  if (body.kind === 'none') {
+    res.end()
+  } else {
+    res.end(body.data)
   }
 }

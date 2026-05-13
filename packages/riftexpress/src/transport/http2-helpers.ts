@@ -69,17 +69,22 @@ export function populateFromH2(
 
   // The `ServerHttp2Stream` IS a Duplex with a Readable side — wrap it in the
   // byte-limit Transform so the cap applies to EVERY consumer, including
-  // `ctx.body.stream()`. Skip the wrap when the cap is disabled (Infinity)
-  // OR when the request is structurally body-less (GET/HEAD/OPTIONS or
-  // explicit Content-Length: 0). Saves a Transform+pipe per body-less
-  // request — the dominant case on read-heavy APIs.
+  // `ctx.body.stream()`. Three provably-safe skip conditions (mirror NodeAdapter):
+  //   1. Body-less method or Content-Length: 0
+  //   2. Cap disabled (Infinity)
+  //   3. Content-Length declared and ≤ cap (pre-check enforced; protocol
+  //      bounds the actual byte count to the declared length)
   const noBody =
     contentLength === 0 ||
     ctx.method === 'GET' ||
     ctx.method === 'HEAD' ||
     ctx.method === 'OPTIONS'
+  const knownSafe =
+    contentLength !== undefined &&
+    Number.isFinite(contentLength) &&
+    contentLength <= maxRequestBytes
   const source =
-    noBody || !Number.isFinite(maxRequestBytes)
+    noBody || !Number.isFinite(maxRequestBytes) || knownSafe
       ? stream
       : stream.pipe(createByteLimit(maxRequestBytes))
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
