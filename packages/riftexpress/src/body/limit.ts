@@ -1,8 +1,8 @@
 import { Transform, type TransformCallback } from 'node:stream'
-import { RexPayloadTooLargeError } from '../errors.ts'
+import { RiftexPayloadTooLargeError } from '../errors.ts'
 
 /**
- * A `Transform` stream that aborts with `RexPayloadTooLargeError` as soon as
+ * A `Transform` stream that aborts with `RiftexPayloadTooLargeError` as soon as
  * cumulative throughput exceeds `maxBytes`. The check happens before the
  * chunk is emitted downstream, so consumers never see bytes past the limit.
  */
@@ -12,7 +12,7 @@ export function createByteLimit(maxBytes: number): Transform {
     transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
       total += chunk.length
       if (total > maxBytes) {
-        callback(new RexPayloadTooLargeError(`Request body exceeded ${maxBytes} bytes`))
+        callback(new RiftexPayloadTooLargeError(`Request body exceeded ${maxBytes} bytes`))
         return
       }
       callback(null, chunk)

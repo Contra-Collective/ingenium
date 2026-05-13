@@ -51,12 +51,12 @@ dist
 .DS_Store
 `,
 
-  'src/index.ts': `import { rex, Router, type RexMiddleware } from 'riftexpress'
+  'src/index.ts': `import { riftex, Router, type RiftexMiddleware } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 
 // Logger middleware — same (ctx, next) pattern Koa users will recognize.
-const logger: RexMiddleware = async (ctx, next) => {
+const logger: RiftexMiddleware = async (ctx, next) => {
   const start = Date.now()
   await next()
   console.log(\`\${ctx.method} \${ctx.path} -> \${Date.now() - start}ms\`)
@@ -64,7 +64,7 @@ const logger: RexMiddleware = async (ctx, next) => {
 app.use(logger)
 
 // JSON body parsing default (no-op in v0.0.1; kept for Express ergonomics).
-app.use(rex.json())
+app.use(riftex.json())
 
 // GET / — return any value, RiftExpress reflects it to the wire.
 app.get('/', () => 'Hello from \${NAME}')
@@ -96,7 +96,7 @@ console.log(\`Listening on http://localhost:\${server.port}\`)
 
   'README.md': `# \${NAME}
 
-A RiftExpress project scaffolded with \`rex new\`.
+A RiftExpress project scaffolded with \`riftex new\`.
 
 ## Run
 

@@ -5,7 +5,7 @@
 //   - `ctx.requireAuth()` — guard that throws 401 if `ctx.user` is null
 // The plugin uses module augmentation so handlers see the typed surface.
 
-import { RexUnauthorizedError, type RexPlugin } from 'riftexpress'
+import { RiftexUnauthorizedError, type RiftexPlugin } from 'riftexpress'
 import { prepared, type DB } from './db.ts'
 
 export interface AuthUser {
@@ -16,9 +16,9 @@ export interface AuthUser {
 }
 
 declare module 'riftexpress' {
-  interface RexContext {
+  interface RiftexContext {
     user: AuthUser | null
-    /** Throws RexUnauthorizedError unless a valid bearer token is presented. */
+    /** Throws RiftexUnauthorizedError unless a valid bearer token is presented. */
     requireAuth: () => AuthUser
   }
 }
@@ -29,7 +29,7 @@ export interface AuthPluginOpts {
 
 const BEARER = /^Bearer\s+(.+)$/i
 
-export const authPlugin: RexPlugin<AuthPluginOpts> = (app, opts) => {
+export const authPlugin: RiftexPlugin<AuthPluginOpts> = (app, opts) => {
   const stmts = prepared(opts.db)
 
   // Lazy: most requests don't read `ctx.user` (think /health). When they do,
@@ -45,7 +45,7 @@ export const authPlugin: RexPlugin<AuthPluginOpts> = (app, opts) => {
 
   app.decorate('requireAuth', (ctx) => (): AuthUser => {
     const u = ctx.user
-    if (!u) throw new RexUnauthorizedError('Authentication required')
+    if (!u) throw new RiftexUnauthorizedError('Authentication required')
     return u
   })
 }

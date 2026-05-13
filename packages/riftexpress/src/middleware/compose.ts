@@ -1,6 +1,6 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import { reflectReturn } from '../response/reflect.ts'
-import type { ComposedHandler, RexMiddleware } from './types.ts'
+import type { ComposedHandler, RiftexMiddleware } from './types.ts'
 
 const NOOP: ComposedHandler = async () => {}
 
@@ -17,7 +17,7 @@ const NOOP: ComposedHandler = async () => {}
  * Double-`next()` calls are detected only when `process.env.REX_DEBUG` is
  * truthy, to keep the production hot path free of per-call guard variables.
  */
-export function compose(stack: readonly RexMiddleware[]): ComposedHandler {
+export function compose(stack: readonly RiftexMiddleware[]): ComposedHandler {
   const len = stack.length
   if (len === 0) return NOOP
 
@@ -66,13 +66,13 @@ export function compose(stack: readonly RexMiddleware[]): ComposedHandler {
  * on JSON-returning routes that don't touch the body.
  */
 export function composeWithHandler(
-  middleware: readonly RexMiddleware[],
-  handler: (ctx: RexContext) => unknown | Promise<unknown>,
+  middleware: readonly RiftexMiddleware[],
+  handler: (ctx: RiftexContext) => unknown | Promise<unknown>,
 ): ComposedHandler {
   if (middleware.length === 0) {
     return makeFastTerminal(handler)
   }
-  const terminal: RexMiddleware = async (ctx) => {
+  const terminal: RiftexMiddleware = async (ctx) => {
     const result = await handler(ctx)
     reflectReturn(ctx, result)
   }
@@ -81,7 +81,7 @@ export function composeWithHandler(
 
 /** No-middleware fast path: skip compose, skip await when handler is sync. */
 function makeFastTerminal(
-  handler: (ctx: RexContext) => unknown | Promise<unknown>,
+  handler: (ctx: RiftexContext) => unknown | Promise<unknown>,
 ): ComposedHandler {
   return async (ctx) => {
     const r = handler(ctx)

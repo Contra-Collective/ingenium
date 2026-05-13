@@ -1,6 +1,6 @@
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 app.post('/echo', async (ctx) => {
   const body = await ctx.body.json<{ name?: string }>()
   return { name: body?.name, processedAt: Date.now() }

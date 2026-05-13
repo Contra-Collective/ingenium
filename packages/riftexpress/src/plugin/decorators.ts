@@ -1,4 +1,4 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { Decorator, EagerDecorator, LazyDecorator } from './types.ts'
 
 interface LazyEntry {
@@ -13,7 +13,7 @@ interface EagerEntry {
 
 /**
  * Per-app registry of decorators. Decorators are NOT installed onto
- * `RexContext.prototype` — that would mutate a shared class and leak across
+ * `RiftexContext.prototype` — that would mutate a shared class and leak across
  * apps in the same process. Instead, `applyTo(ctx)` writes them onto each
  * pooled context instance at request start.
  *
@@ -34,7 +34,7 @@ interface EagerEntry {
  *
  * # Pool reuse
  *
- * Pooled contexts are reset between requests; the `RexContext.reset()`
+ * Pooled contexts are reset between requests; the `RiftexContext.reset()`
  * method does not know about decorator names, so each request re-applies
  * via `applyTo(ctx)`. Lazy `defineProperty` overwrites the previous slot
  * configuration cleanly; eager assignment overwrites the previous value.
@@ -63,7 +63,7 @@ export class DecoratorRegistry {
    * Install all registered decorators onto a single context instance.
    * Called by `app.handle` after `onRequest` hooks and before dispatch.
    */
-  applyTo(ctx: RexContext): void {
+  applyTo(ctx: RiftexContext): void {
     // Eager: simple assignment.
     for (let i = 0; i < this.eager.length; i++) {
       const entry = this.eager[i]!
@@ -82,7 +82,7 @@ export class DecoratorRegistry {
  * data property holding the resolved value. After first access, reads are
  * free of any getter overhead.
  */
-function defineLazy(ctx: RexContext, name: string, factory: LazyDecorator): void {
+function defineLazy(ctx: RiftexContext, name: string, factory: LazyDecorator): void {
   Object.defineProperty(ctx, name, {
     configurable: true,
     enumerable: true,

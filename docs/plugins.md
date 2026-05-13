@@ -6,7 +6,7 @@ an app, and plugins compose via lifecycle hooks and per-request decorators.
 ## Plugin signature
 
 ```ts
-type RexPlugin<O = void> = (app: RexApp, opts: O) => void | Promise<void>
+type RiftexPlugin<O = void> = (app: RiftexApp, opts: O) => void | Promise<void>
 
 await app.register(myPlugin, opts)   // when the plugin requires options
 await app.register(myPlugin)         // when the plugin takes no options
@@ -61,7 +61,7 @@ To make decorated values appear in TypeScript intellisense:
 
 ```ts
 declare module 'riftexpress' {
-  interface RexContext {
+  interface RiftexContext {
     user: User
     requireAuth: () => void
   }
@@ -71,12 +71,12 @@ declare module 'riftexpress' {
 ## Example: auth plugin
 
 ```ts
-import type { RexPlugin } from 'riftexpress'
-import { RexUnauthorizedError } from 'riftexpress'
+import type { RiftexPlugin } from 'riftexpress'
+import { RiftexUnauthorizedError } from 'riftexpress'
 
 interface AuthOpts { token: string; user: User }
 
-export const authPlugin: RexPlugin<AuthOpts> = (app, opts) => {
+export const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
   app.hooks.onRequest((ctx) => {
     ctx.state.authValid = ctx.headers.authorization === `Bearer ${opts.token}`
   })
@@ -84,7 +84,7 @@ export const authPlugin: RexPlugin<AuthOpts> = (app, opts) => {
   app.decorate('user', (ctx) => ctx.state.authValid ? opts.user : null)
 
   app.decorate('requireAuth', (ctx) => () => {
-    if (!ctx.state.authValid) throw new RexUnauthorizedError()
+    if (!ctx.state.authValid) throw new RiftexUnauthorizedError()
   })
 }
 

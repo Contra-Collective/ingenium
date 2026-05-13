@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer'
 
 /**
- * Options for `RexBody.multipart()`.
+ * Options for `RiftexBody.multipart()`.
  *
  * All limits are validated mid-parse — exceeding any of them throws before
  * the full body is fully decoded so memory usage stays bounded.

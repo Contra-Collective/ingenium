@@ -7,11 +7,11 @@
 
 import { pathToFileURL } from 'node:url'
 import {
-  rex,
-  RexNotFoundError,
-  RexUnauthorizedError,
-  RexValidationError,
-  type RexApp,
+  riftex,
+  RiftexNotFoundError,
+  RiftexUnauthorizedError,
+  RiftexValidationError,
+  type RiftexApp,
 } from 'riftexpress'
 import { loadConfig, type AppConfig } from './config.ts'
 import { openDatabase, type DB } from './db.ts'
@@ -28,8 +28,8 @@ export interface BuildAppOptions {
   logger: Logger
 }
 
-export async function buildApp(opts: BuildAppOptions): Promise<RexApp> {
-  const app = rex()
+export async function buildApp(opts: BuildAppOptions): Promise<RiftexApp> {
+  const app = riftex()
 
   await app.register(loggerPlugin, { logger: opts.logger })
   await app.register(authPlugin, { db: opts.db })
@@ -38,19 +38,19 @@ export async function buildApp(opts: BuildAppOptions): Promise<RexApp> {
   // useful status codes, but never leak stack traces. Unknowns are logged
   // with full context and surfaced as a generic 500.
   app.onError((err, ctx) => {
-    if (err instanceof RexValidationError) {
+    if (err instanceof RiftexValidationError) {
       ctx.json({ error: err.message, code: err.code, fields: err.fields }, 422)
       return
     }
-    if (err instanceof RexUnauthorizedError) {
+    if (err instanceof RiftexUnauthorizedError) {
       ctx.json({ error: err.message, code: err.code }, 401)
       return
     }
-    if (err instanceof RexNotFoundError) {
+    if (err instanceof RiftexNotFoundError) {
       ctx.json({ error: err.message, code: err.code }, 404)
       return
     }
-    // Other RexErrors (e.g. RexBadRequestError) — honor their statusCode.
+    // Other RiftexErrors (e.g. RiftexBadRequestError) — honor their statusCode.
     if (err instanceof Error && 'statusCode' in err && typeof err.statusCode === 'number') {
       const code = (err as { code?: string }).code ?? 'ERROR'
       ctx.json({ error: err.message, code }, err.statusCode)

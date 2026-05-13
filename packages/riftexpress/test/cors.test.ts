@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import { corsMiddleware } from '../src/cors/middleware.ts'
 import type { HttpMethod } from '../src/router/types.ts'
 
 function makeCtx(
   method: HttpMethod = 'GET',
   headers: Record<string, string> = {},
-): RexContext {
-  const ctx = new RexContext()
+): RiftexContext {
+  const ctx = new RiftexContext()
   ctx.method = method
   ctx.path = '/'
   ctx.url = '/'

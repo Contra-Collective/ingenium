@@ -30,6 +30,6 @@ curl -X POST -H "content-type: application/json" \
 
 `Bun.serve()` uses the WinterCG `Request` / `Response` shape, not Node's
 `IncomingMessage` / `ServerResponse`. `BunAdapter` translates between the
-two so the framework's pooled `RexContext` and lazy body parsers work
+two so the framework's pooled `RiftexContext` and lazy body parsers work
 unchanged. See [`packages/riftexpress-bun`](../../packages/riftexpress-bun)
 for the adapter source and known limitations.

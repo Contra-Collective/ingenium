@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { Readable } from 'node:stream'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /**
  * Reflect a handler's return value to the response per the contract:
@@ -17,7 +17,7 @@ import type { RexContext } from '../context/context.ts'
  * If a `ctx.json/text/html/stream/redirect/send` helper has already been
  * called, the return value is ignored.
  */
-export function reflectReturn(ctx: RexContext, value: unknown): void {
+export function reflectReturn(ctx: RiftexContext, value: unknown): void {
   if (ctx._written) return
 
   if (value === undefined || value === null) {

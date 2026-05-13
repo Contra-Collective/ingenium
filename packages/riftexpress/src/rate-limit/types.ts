@@ -1,4 +1,4 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /**
  * Pluggable backing store for the rate-limit middleware. The default
@@ -43,14 +43,14 @@ export interface RateLimitOptions {
    * forgeable. Production deployments behind a proxy should validate the
    * proxy chain or supply a custom `keyGenerator`.
    */
-  keyGenerator?: (ctx: RexContext) => string
+  keyGenerator?: (ctx: RiftexContext) => string
 
   /**
    * Skip rate-limiting for a given request. When this returns `true`, no
    * counter hit is recorded and no `X-RateLimit-*` headers are written.
    * Default: never skip.
    */
-  skip?: (ctx: RexContext) => boolean
+  skip?: (ctx: RiftexContext) => boolean
 
   /**
    * Backing store. Default: an in-process {@link MemoryStore}. Swap in a

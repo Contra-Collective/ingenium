@@ -21,40 +21,40 @@ the production-grade middleware required for non-trivial deployments.
 
 ### Added
 
-- **App + Router.** `rex()` factory, `RexApp`, mountable `Router` with prefix
+- **App + Router.** `riftex()` factory, `RiftexApp`, mountable `Router` with prefix
   composition, lazy middleware composition with a dirty-bit recompose, and
   `app.compose()` pre-warm.
 - **Routing.** Radix-trie router with deterministic precedence
   (static > `:param` > `*wildcard`), optional params (`:id?`), wildcard tails
   (`*path`), typed param extraction via `ExtractParams<Path>`.
-- **Context + body.** Pooled `RexContext`, lazy `URLSearchParams`, lazy
-  `RexBody` parsers (`json`, `text`, `urlencoded`, `buffer`, `stream`,
+- **Context + body.** Pooled `RiftexContext`, lazy `URLSearchParams`, lazy
+  `RiftexBody` parsers (`json`, `text`, `urlencoded`, `buffer`, `stream`,
   `multipart`). Body-parser default limit is **100,000 bytes** (matches
   Express's `body-parser` default).
-- **Multipart.** Native `RexBody.multipart()` for `multipart/form-data` with
+- **Multipart.** Native `RiftexBody.multipart()` for `multipart/form-data` with
   per-file / per-field caps and an allow-list for MIME prefixes.
 - **Validation.** First-class
   [Standard Schema v1](https://standardschema.dev) detection in
-  `RexBody.json(schema)`, with fallbacks for Zod's `safeParse` and any
+  `RiftexBody.json(schema)`, with fallbacks for Zod's `safeParse` and any
   `{ parse(input): T }` validator. Issues normalized into a
-  `RexValidationError` with a `fields` map.
+  `RiftexValidationError` with a `fields` map.
 - **Response helpers.** `ctx.json/text/html/send/redirect/stream` plus
   return-value reflection (object → JSON, string → text/html, `Buffer` →
   octet-stream, `Readable` → stream, `undefined` → 204).
-- **Errors.** `RexError` hierarchy
-  (`RexNotFoundError`, `RexUnauthorizedError`, `RexMethodNotAllowedError`,
-  `RexPayloadTooLargeError`, `RexValidationError`, `RexBadRequestError`)
+- **Errors.** `RiftexError` hierarchy
+  (`RiftexNotFoundError`, `RiftexUnauthorizedError`, `RiftexMethodNotAllowedError`,
+  `RiftexPayloadTooLargeError`, `RiftexValidationError`, `RiftexBadRequestError`)
   and an `app.onError(handler)` boundary that re-throws to delegate.
 - **Plugins.** `app.register(plugin, opts?)`, lifecycle hooks (`onRoute`,
   `onCompose`, `onRequest`, `onResponse`, `onError`), `app.decorate(name, fn)`
   (lazy) and `app.decorateRequest(name, fn)` (eager). Hot path
   short-circuits when no plugins are registered.
 - **Middleware (built-ins).**
-  - `rex.json(opts?)` / `rex.urlencoded(opts?)` — Express-compat no-ops
+  - `riftex.json(opts?)` / `riftex.urlencoded(opts?)` — Express-compat no-ops
     (parsing remains lazy via `ctx.body.*`).
-  - `rex.static(root, opts?)` — ETag, conditional GET, range requests, MIME
+  - `riftex.static(root, opts?)` — ETag, conditional GET, range requests, MIME
     detection, `index` / `extensions` / `dotfiles` / `maxAge` (ms).
-  - `rex.cors(opts?)` — simple + preflight CORS with origin allowlist /
+  - `riftex.cors(opts?)` — simple + preflight CORS with origin allowlist /
     regex / function, `Vary: Origin`, credentials guard against `*`.
   - `sessionMiddleware` — HMAC-signed cookie sessions, key rotation,
     `regenerate()`, pluggable store (default in-process), rolling TTL.
@@ -70,7 +70,7 @@ the production-grade middleware required for non-trivial deployments.
     `node:stream` body bridge.
   - `WsNodeAdapter` (`riftexpress/ws`) — opt-in WebSocket support via the
     optional `ws` peer dep, exposed through `enableWebSockets(app)`.
-- **Trust-proxy.** `RexAppOptions.trustProxy` mirroring Express's
+- **Trust-proxy.** `RiftexAppOptions.trustProxy` mirroring Express's
   `app.set('trust proxy', ...)` semantics — booleans, hop counts, CIDRs,
   keywords (`loopback`, `linklocal`, `uniquelocal`), or a custom predicate.
   `ctx.ip`, `ctx.ips`, `ctx.protocol`, `ctx.hostname`, `ctx.secure` are
@@ -83,8 +83,8 @@ the production-grade middleware required for non-trivial deployments.
   proxies pure-function `(req, res, next)` middleware (cors, helmet,
   morgan, compression). Documented incompatibilities in
   `docs/migration-guide.md`.
-- **CLI** (`riftexpress-cli`). `rex new <name> [--bun|--minimal|--force]`
-  scaffolds a project. `rex routes` is reserved for v0.2.
+- **CLI** (`riftexpress-cli`). `riftex new <name> [--bun|--minimal|--force]`
+  scaffolds a project. `riftex routes` is reserved for v0.2.
 - **CI.** GitHub Actions matrix on Node 20 / 22 / 24 across Ubuntu and
   Windows; typecheck + Vitest run on every push.
 - **Architecture decision records.** `docs/adr/0001`–`0005` covering the
@@ -114,9 +114,9 @@ the production-grade middleware required for non-trivial deployments.
 - `sessionMiddleware` uses HMAC-SHA-256, `timingSafeEqual` verification,
   and 144-bit random ids. Tampered cookies silently issue a fresh session
   (no error response) so this surface is not an oracle.
-- `rex.cors` rejects `credentials: true` combined with `origin: '*'` at
+- `riftex.cors` rejects `credentials: true` combined with `origin: '*'` at
   construction time per the Fetch spec.
-- `rex.static` resolves paths under `root` and rejects traversal; the
+- `riftex.static` resolves paths under `root` and rejects traversal; the
   `dotfiles` policy defaults to `'ignore'`.
 - Default rate-limit `keyGenerator` reads `X-Forwarded-For` directly —
   see the JSDoc warning. Production deployments behind a proxy must

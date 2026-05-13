@@ -4,10 +4,10 @@
 
 import { randomUUID } from 'node:crypto'
 import { pino, type Logger } from 'pino'
-import type { RexPlugin } from 'riftexpress'
+import type { RiftexPlugin } from 'riftexpress'
 
 declare module 'riftexpress' {
-  interface RexContext {
+  interface RiftexContext {
     /** Per-request child logger. Includes `reqId`, `method`, `path`. */
     log: Logger
     /** Wall-clock start time (ms since epoch) — used to compute response latency. */
@@ -30,7 +30,7 @@ export function createLogger(opts: LoggerPluginOpts): Logger {
   })
 }
 
-export const loggerPlugin: RexPlugin<{ logger: Logger }> = (app, opts) => {
+export const loggerPlugin: RiftexPlugin<{ logger: Logger }> = (app, opts) => {
   const root = opts.logger
 
   // Eager: cheap, every request reads `reqId` for downstream correlation.
@@ -44,7 +44,7 @@ export const loggerPlugin: RexPlugin<{ logger: Logger }> = (app, opts) => {
   })
 
   app.hooks.onResponse((ctx) => {
-    // `_statusCode` is technically @internal in RexContext but it's the only
+    // `_statusCode` is technically @internal in RiftexContext but it's the only
     // way today to observe the resolved response status from a hook. Adding
     // a public `ctx.statusCode` getter would let us drop this cast.
     const status = (ctx as unknown as { _statusCode: number })._statusCode

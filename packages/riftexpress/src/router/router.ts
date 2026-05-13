@@ -1,12 +1,12 @@
-import type { RexHandler, RexMiddleware } from '../middleware/types.ts'
+import type { RiftexHandler, RiftexMiddleware } from '../middleware/types.ts'
 import type { HttpMethod } from './types.ts'
 
 /** A journal entry — replayed against the trie when the app composes. */
 export type Registration =
-  | { kind: 'use-global'; mw: RexMiddleware }
-  | { kind: 'use-prefix'; prefix: string; mw: RexMiddleware }
+  | { kind: 'use-global'; mw: RiftexMiddleware }
+  | { kind: 'use-prefix'; prefix: string; mw: RiftexMiddleware }
   | { kind: 'use-router'; prefix: string; router: Router }
-  | { kind: 'route'; method: HttpMethod; path: string; handler: RexHandler }
+  | { kind: 'route'; method: HttpMethod; path: string; handler: RiftexHandler }
 
 /**
  * A mountable router. Registrations are journaled, not eagerly composed —
@@ -17,10 +17,10 @@ export class Router {
   /** @internal */ readonly journal: Registration[] = []
 
   /** Add middleware that runs for every request below this router. */
-  use(mw: RexMiddleware): this
+  use(mw: RiftexMiddleware): this
   /** Mount middleware or a sub-router at a path prefix. */
-  use(prefix: string, mw: RexMiddleware | Router): this
-  use(arg1: string | RexMiddleware, arg2?: RexMiddleware | Router): this {
+  use(prefix: string, mw: RiftexMiddleware | Router): this
+  use(arg1: string | RiftexMiddleware, arg2?: RiftexMiddleware | Router): this {
     if (typeof arg1 === 'string') {
       const prefix = normalizePrefix(arg1)
       if (arg2 instanceof Router) {
@@ -38,30 +38,30 @@ export class Router {
     return this
   }
 
-  get<P extends string>(path: P, handler: RexHandler): this {
+  get<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('GET', path, handler)
   }
-  post<P extends string>(path: P, handler: RexHandler): this {
+  post<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('POST', path, handler)
   }
-  put<P extends string>(path: P, handler: RexHandler): this {
+  put<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('PUT', path, handler)
   }
-  patch<P extends string>(path: P, handler: RexHandler): this {
+  patch<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('PATCH', path, handler)
   }
-  delete<P extends string>(path: P, handler: RexHandler): this {
+  delete<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('DELETE', path, handler)
   }
-  head<P extends string>(path: P, handler: RexHandler): this {
+  head<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('HEAD', path, handler)
   }
-  options<P extends string>(path: P, handler: RexHandler): this {
+  options<P extends string>(path: P, handler: RiftexHandler): this {
     return this.method('OPTIONS', path, handler)
   }
 
   /** Internal — register a route under any HTTP method. */
-  method(method: HttpMethod, path: string, handler: RexHandler): this {
+  method(method: HttpMethod, path: string, handler: RiftexHandler): this {
     this.journal.push({ kind: 'route', method, path: normalizePath(path), handler })
     return this
   }
@@ -94,9 +94,9 @@ function normalizePath(p: string): string {
  * Used by the App at compose time.
  */
 export interface FlatRegistrations {
-  globalMiddleware: RexMiddleware[]              // unscoped (matches every request)
-  scopedMiddleware: { prefix: string; mw: RexMiddleware }[]
-  routes: { method: HttpMethod; path: string; handler: RexHandler }[]
+  globalMiddleware: RiftexMiddleware[]              // unscoped (matches every request)
+  scopedMiddleware: { prefix: string; mw: RiftexMiddleware }[]
+  routes: { method: HttpMethod; path: string; handler: RiftexHandler }[]
 }
 
 export function flattenRouter(router: Router, prefix: string = ''): FlatRegistrations {

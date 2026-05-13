@@ -2,7 +2,7 @@
 
 A `Bun.serve()` transport adapter for [RiftExpress](../riftexpress). Lets you
 run a RiftExpress app on the Bun runtime instead of `node:http`, with the
-same handler surface and the same per-request `RexContext`.
+same handler surface and the same per-request `RiftexContext`.
 
 ## Install
 
@@ -13,10 +13,10 @@ bun add riftexpress riftexpress-bun
 ## Use
 
 ```ts
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { BunAdapter } from 'riftexpress-bun'
 
-const app = rex({ transport: new BunAdapter() })
+const app = riftex({ transport: new BunAdapter() })
 
 app.get('/', () => ({ hello: 'world' }))
 app.get('/users/:id', (ctx) => ({ id: ctx.params.id }))
@@ -34,7 +34,7 @@ bun run server.ts
 
 On each request, the adapter:
 
-1. Acquires a pooled `RexContext` from the framework.
+1. Acquires a pooled `RiftexContext` from the framework.
 2. Populates it from the WinterCG `Request` (method, url, path, rawQuery,
    headers, and a lazy body bridge — the body is only consumed if your
    handler calls `ctx.body.*`).

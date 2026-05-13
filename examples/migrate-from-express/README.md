@@ -21,7 +21,7 @@ Each server exposes the same routes:
 
 1. **Imports** — `express` -> `riftexpress`. `Router` is named the same.
 2. **Handler signature** — `(req, res, next)` collapses into a single `ctx`. `req.params` -> `ctx.params`, `req.body` -> `await ctx.body.json()`, `res.json(x)` -> `ctx.json(x)` or just `return x`.
-3. **Body parsing** — `express.json()` is up-front and required; `rex.json()` is accepted for compatibility but body parsing is actually lazy (`ctx.body.json()` inside the handler).
+3. **Body parsing** — `express.json()` is up-front and required; `riftex.json()` is accepted for compatibility but body parsing is actually lazy (`ctx.body.json()` inside the handler).
 4. **Error handling** — Express's 4-arg middleware becomes `app.onError(handler)`.
 5. **Logger middleware** — Express needs a `res.on('finish')` hook to time the response. RiftExpress just `await next()` and the timer naturally wraps the request.
 

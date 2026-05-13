@@ -4,7 +4,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { RexNotFoundError, RexValidationError, Router } from 'riftexpress'
+import { RiftexNotFoundError, RiftexValidationError, Router } from 'riftexpress'
 import { hasFts5, prepared, type DB } from '../db.ts'
 
 interface NoteRow {
@@ -67,7 +67,7 @@ export function notesRouter(db: DB): Router {
       // Surface zod issues through the framework's validation error path.
       const fields: Record<string, string> = {}
       for (const i of parsed.error.issues) fields[i.path.join('.') || '_'] = i.message
-      throw new RexValidationError(fields)
+      throw new RiftexValidationError(fields)
     }
     const { limit, offset, tag, q } = parsed.data
 
@@ -109,7 +109,7 @@ export function notesRouter(db: DB): Router {
   r.get('/:id', (ctx) => {
     const user = ctx.requireAuth()
     const row = stmts.findNoteById.get(ctx.params.id) as NoteRow | undefined
-    if (!row || row.user_id !== user.id) throw new RexNotFoundError('Note not found')
+    if (!row || row.user_id !== user.id) throw new RiftexNotFoundError('Note not found')
     return toDto(db, row)
   })
 
@@ -117,7 +117,7 @@ export function notesRouter(db: DB): Router {
   r.patch('/:id', async (ctx) => {
     const user = ctx.requireAuth()
     const existing = stmts.findNoteById.get(ctx.params.id) as NoteRow | undefined
-    if (!existing || existing.user_id !== user.id) throw new RexNotFoundError('Note not found')
+    if (!existing || existing.user_id !== user.id) throw new RiftexNotFoundError('Note not found')
 
     const patch = await ctx.body.json(PatchNoteSchema)
 
@@ -143,7 +143,7 @@ export function notesRouter(db: DB): Router {
   r.delete('/:id', (ctx) => {
     const user = ctx.requireAuth()
     const existing = stmts.findNoteById.get(ctx.params.id) as NoteRow | undefined
-    if (!existing || existing.user_id !== user.id) throw new RexNotFoundError('Note not found')
+    if (!existing || existing.user_id !== user.id) throw new RiftexNotFoundError('Note not found')
     stmts.deleteNote.run(existing.id)
     ctx.status(204)
     // Returning undefined here triggers the framework's 204-no-content rule.

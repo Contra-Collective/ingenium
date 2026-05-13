@@ -1,10 +1,10 @@
 // riftexpress-cli entry. Zero runtime deps. Argv parsed by hand.
 //
 // Subcommands:
-//   rex new <name> [--bun] [--minimal] [--force]
-//   rex routes
-//   rex --version | -v
-//   rex --help    | -h
+//   riftex new <name> [--bun] [--minimal] [--force]
+//   riftex routes
+//   riftex --version | -v
+//   riftex --help    | -h
 
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -13,13 +13,13 @@ import process from 'node:process'
 
 import { scaffold, type TemplateName } from './scaffold.ts'
 
-const HELP = `rex — RiftExpress project scaffolder
+const HELP = `riftex — RiftExpress project scaffolder
 
 Usage:
-  rex new <name> [--bun] [--minimal] [--force]
-  rex routes
-  rex --version
-  rex --help
+  riftex new <name> [--bun] [--minimal] [--force]
+  riftex routes
+  riftex --version
+  riftex --help
 
 Commands:
   new <name>     Scaffold a new RiftExpress project at ./<name>.
@@ -29,9 +29,9 @@ Commands:
   routes         (placeholder) print the route table for a project
 
 Examples:
-  rex new my-api
-  rex new my-api --minimal
-  rex new my-api --bun
+  riftex new my-api
+  riftex new my-api --minimal
+  riftex new my-api --bun
 `
 
 interface ParsedArgs {
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
     case 'new': {
       const name = positionals[0]
       if (name === undefined || name.length === 0) {
-        process.stderr.write('rex new: missing project name\n\n')
+        process.stderr.write('riftex new: missing project name\n\n')
         process.stderr.write(HELP)
         process.exit(2)
         return
@@ -105,19 +105,19 @@ async function main(): Promise<void> {
         process.stdout.write(`\nNext steps:\n  cd ${name}\n  npm install\n  npm run dev\n`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        process.stderr.write(`rex new: ${msg}\n`)
+        process.stderr.write(`riftex new: ${msg}\n`)
         process.exit(1)
       }
       return
     }
     case 'routes': {
       process.stdout.write(
-        'rex routes: not implemented in v0.0.1; coming with route introspection API\n',
+        'riftex routes: not implemented in v0.0.1; coming with route introspection API\n',
       )
       return
     }
     default: {
-      process.stderr.write(`rex: unknown command "${command}"\n\n`)
+      process.stderr.write(`riftex: unknown command "${command}"\n\n`)
       process.stderr.write(HELP)
       process.exit(2)
     }

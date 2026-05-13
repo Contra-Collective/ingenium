@@ -1,13 +1,13 @@
-import type { RexContext } from 'riftexpress'
+import type { RiftexContext } from 'riftexpress'
 
 /**
- * Minimal IncomingMessage-like object built over a RexContext.
+ * Minimal IncomingMessage-like object built over a RiftexContext.
  *
  * We expose `ctx.state` keys directly on the shim so Express middleware can
  * read/write `req.user`, `req.session`, etc. The wrapper in `index.ts` mirrors
  * any new props back into `ctx.state` after the middleware completes.
  */
-export interface RexReqShim {
+export interface RiftexReqShim {
   method: string
   url: string
   originalUrl: string
@@ -32,8 +32,8 @@ function parseQuery(rawQuery: string): Record<string, string | string[]> {
   return out
 }
 
-export function createReqShim(ctx: RexContext): RexReqShim {
-  const req: RexReqShim = {
+export function createReqShim(ctx: RiftexContext): RiftexReqShim {
+  const req: RiftexReqShim = {
     method: ctx.method,
     url: ctx.url,
     originalUrl: ctx.url,
@@ -55,7 +55,7 @@ export function createReqShim(ctx: RexContext): RexReqShim {
 
 /**
  * Mirror any non-known fields the middleware added/changed on `req` back into
- * `ctx.state` so subsequent Rex middleware sees them.
+ * `ctx.state` so subsequent Riftex middleware sees them.
  */
 const REQ_RESERVED = new Set([
   'method',
@@ -68,7 +68,7 @@ const REQ_RESERVED = new Set([
   'socket',
 ])
 
-export function syncReqStateBack(req: RexReqShim, ctx: RexContext): void {
+export function syncReqStateBack(req: RiftexReqShim, ctx: RiftexContext): void {
   for (const k of Object.keys(req)) {
     if (REQ_RESERVED.has(k)) continue
     ctx.state[k] = req[k]

@@ -1,7 +1,7 @@
 import type { ServerHttp2Stream, IncomingHttpHeaders as Http2IncomingHeaders } from 'node:http2'
 import { constants as h2 } from 'node:http2'
 import type { IncomingHttpHeaders } from 'node:http'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
 
 /**
@@ -26,12 +26,12 @@ const FORBIDDEN_RESPONSE_HEADERS = new Set<string>([
 ])
 
 /**
- * Populate a pooled `RexContext` from an inbound HTTP/2 stream + headers map.
+ * Populate a pooled `RiftexContext` from an inbound HTTP/2 stream + headers map.
  * Mirrors `node.ts`'s `populateContext` but unpacks pseudo-headers and
  * uppercases the method (HTTP/2 sends it lowercase per node:http2 convention).
  */
 export function populateFromH2(
-  ctx: RexContext,
+  ctx: RiftexContext,
   stream: ServerHttp2Stream,
   headers: Http2IncomingHeaders,
 ): void {
@@ -65,17 +65,17 @@ export function populateFromH2(
   const contentLength = typeof cl === 'string' ? Number(cl) : undefined
   const ct = typeof userHeaders['content-type'] === 'string' ? (userHeaders['content-type'] as string) : undefined
 
-  // The `ServerHttp2Stream` IS a Duplex with a Readable side — `RexBody` only
+  // The `ServerHttp2Stream` IS a Duplex with a Readable side — `RiftexBody` only
   // reads from it (via the byte-limit Transform), which works identically.
   ctx.body._attach(stream, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
 /**
- * Write the `RexContext` response state to an HTTP/2 stream. Handles all four
+ * Write the `RiftexContext` response state to an HTTP/2 stream. Handles all four
  * `_body.kind` variants. HTTP/2 has no `Transfer-Encoding: chunked` (framing
  * is implicit) and no hop-by-hop headers, so we strip those before responding.
  */
-export function writeH2Response(ctx: RexContext, stream: ServerHttp2Stream): void {
+export function writeH2Response(ctx: RiftexContext, stream: ServerHttp2Stream): void {
   if (stream.destroyed || stream.closed) return
 
   const responseHeaders: Record<string, string | string[] | number> = Object.create(null)

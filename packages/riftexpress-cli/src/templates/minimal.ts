@@ -49,9 +49,9 @@ dist
 .DS_Store
 `,
 
-  'src/index.ts': `import { rex } from 'riftexpress'
+  'src/index.ts': `import { riftex } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 app.get('/', () => 'Hello from \${NAME}')
 
 const server = await app.listen(3000)

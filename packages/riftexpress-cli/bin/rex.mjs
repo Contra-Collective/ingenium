@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Shim entry for `rex`. Spawns Node 22+ with native TS stripping pointed at
+// Shim entry for `riftex`. Spawns Node 22+ with native TS stripping pointed at
 // the source CLI. This avoids a build step entirely.
 //
 // Requires Node >= 22 (for --experimental-strip-types).
@@ -29,6 +29,6 @@ child.on('exit', (code, signal) => {
 })
 
 child.on('error', (err) => {
-  console.error('rex: failed to launch CLI:', err.message)
+  console.error('riftex: failed to launch CLI:', err.message)
   process.exit(1)
 })

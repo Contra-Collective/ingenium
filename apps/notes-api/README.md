@@ -16,8 +16,8 @@ zero external services.
 - Module augmentation so decorated fields show up on `ctx` in TypeScript
 - `Router()` per resource group, mounted under `/api`
 - `ctx.body.json(zodSchema)` validation at the body-parse boundary
-- Centralized `app.onError` mapping `RexValidationError` → 422,
-  `RexUnauthorizedError` → 401, `RexNotFoundError` → 404
+- Centralized `app.onError` mapping `RiftexValidationError` → 422,
+  `RiftexUnauthorizedError` → 401, `RiftexNotFoundError` → 404
 - `app.hooks.onRequest` / `onResponse` for structured request logging
 - Real persistent storage via `better-sqlite3` (WAL + foreign keys, FTS5
   for full-text search with a graceful LIKE fallback)

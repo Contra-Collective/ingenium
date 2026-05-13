@@ -1,32 +1,32 @@
 import { Buffer } from 'node:buffer'
-import type { RexContext } from 'riftexpress'
+import type { RiftexContext } from 'riftexpress'
 
 /**
  * Minimal ServerResponse-like surface used by cors / helmet / morgan /
- * compression. Mutates the underlying RexContext's response state directly
+ * compression. Mutates the underlying RiftexContext's response state directly
  * so that whether the middleware writes the response or just sets headers,
  * the changes land where the framework expects them.
  */
-export interface RexResShim {
+export interface RiftexResShim {
   headersSent: boolean
   finished: boolean
   statusCode: number
-  status(code: number): RexResShim
-  setHeader(name: string, value: string | string[] | number): RexResShim
+  status(code: number): RiftexResShim
+  setHeader(name: string, value: string | string[] | number): RiftexResShim
   getHeader(name: string): string | string[] | undefined
   removeHeader(name: string): void
-  writeHead(code: number, headers?: Record<string, string | string[] | number>): RexResShim
-  json(body: unknown): RexResShim
-  send(body: unknown): RexResShim
-  end(chunk?: string | Buffer, encoding?: BufferEncoding): RexResShim
+  writeHead(code: number, headers?: Record<string, string | string[] | number>): RiftexResShim
+  json(body: unknown): RiftexResShim
+  send(body: unknown): RiftexResShim
+  end(chunk?: string | Buffer, encoding?: BufferEncoding): RiftexResShim
   /** @internal — true once a terminal write happened. */
   _ended: boolean
 }
 
-export function createResShim(ctx: RexContext): RexResShim {
+export function createResShim(ctx: RiftexContext): RiftexResShim {
   // `any` allowed inside this shim: Express's ServerResponse signatures are
   // wildly polymorphic and we only model the subset the target middlewares hit.
-  const res: RexResShim = {
+  const res: RiftexResShim = {
     headersSent: false,
     finished: false,
 
@@ -37,12 +37,12 @@ export function createResShim(ctx: RexContext): RexResShim {
       ctx._statusCode = code
     },
 
-    status(code: number): RexResShim {
+    status(code: number): RiftexResShim {
       ctx._statusCode = code
       return res
     },
 
-    setHeader(name: string, value: string | string[] | number): RexResShim {
+    setHeader(name: string, value: string | string[] | number): RiftexResShim {
       ctx._headers[name.toLowerCase()] = typeof value === 'number' ? String(value) : value
       return res
     },
@@ -55,7 +55,7 @@ export function createResShim(ctx: RexContext): RexResShim {
       delete ctx._headers[name.toLowerCase()]
     },
 
-    writeHead(code: number, headers?: Record<string, string | string[] | number>): RexResShim {
+    writeHead(code: number, headers?: Record<string, string | string[] | number>): RiftexResShim {
       ctx._statusCode = code
       if (headers) {
         for (const k of Object.keys(headers)) {
@@ -68,7 +68,7 @@ export function createResShim(ctx: RexContext): RexResShim {
       return res
     },
 
-    json(body: unknown): RexResShim {
+    json(body: unknown): RiftexResShim {
       ctx.json(body)
       res.headersSent = true
       res.finished = true
@@ -76,7 +76,7 @@ export function createResShim(ctx: RexContext): RexResShim {
       return res
     },
 
-    send(body: unknown): RexResShim {
+    send(body: unknown): RiftexResShim {
       if (body === undefined || body === null) {
         ctx._body = { kind: 'none' }
         ctx._written = true
@@ -95,7 +95,7 @@ export function createResShim(ctx: RexContext): RexResShim {
       return res
     },
 
-    end(chunk?: string | Buffer, _encoding?: BufferEncoding): RexResShim {
+    end(chunk?: string | Buffer, _encoding?: BufferEncoding): RiftexResShim {
       if (chunk !== undefined) {
         if (typeof chunk === 'string') {
           ctx._body = { kind: 'string', data: chunk }

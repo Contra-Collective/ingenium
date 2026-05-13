@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import cors from 'cors'
 import helmet from 'helmet'
-import { RexContext, type RexMiddleware } from 'riftexpress'
+import { RiftexContext, type RiftexMiddleware } from 'riftexpress'
 import { expressCompat } from '../src/index.ts'
 
-function makeCtx(init?: Partial<{ method: string; url: string; path: string; rawQuery: string; headers: Record<string, string> }>): RexContext {
-  const ctx = new RexContext()
-  if (init?.method) ctx.method = init.method as RexContext['method']
+function makeCtx(init?: Partial<{ method: string; url: string; path: string; rawQuery: string; headers: Record<string, string> }>): RiftexContext {
+  const ctx = new RiftexContext()
+  if (init?.method) ctx.method = init.method as RiftexContext['method']
   if (init?.url) ctx.url = init.url
   if (init?.path) ctx.path = init.path
   if (init?.rawQuery) ctx.rawQuery = init.rawQuery
@@ -33,30 +33,30 @@ describe('expressCompat', () => {
     expect(ctx.getHeader('x-dns-prefetch-control')).toBeDefined()
   })
 
-  it('middleware that calls next() without writing lets the Rex chain continue', async () => {
+  it('middleware that calls next() without writing lets the Riftex chain continue', async () => {
     let downstreamRan = false
     const mw = expressCompat((_req, res, next) => {
       // Set a header but do NOT write the response.
       res.setHeader('x-from-express', 'yes')
       next()
     })
-    const downstream: RexMiddleware = async (ctx) => {
+    const downstream: RiftexMiddleware = async (ctx) => {
       downstreamRan = true
-      ctx.setHeader('x-from-rex', 'yes')
+      ctx.setHeader('x-from-riftex', 'yes')
     }
     const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
     await mw(ctx, () => downstream(ctx, noopNext) as Promise<void>)
     expect(downstreamRan).toBe(true)
     expect(ctx.getHeader('x-from-express')).toBe('yes')
-    expect(ctx.getHeader('x-from-rex')).toBe('yes')
+    expect(ctx.getHeader('x-from-riftex')).toBe('yes')
   })
 
-  it('middleware that writes via res.json() blocks subsequent Rex middleware', async () => {
+  it('middleware that writes via res.json() blocks subsequent Riftex middleware', async () => {
     let downstreamRan = false
     const mw = expressCompat((_req, res, _next) => {
       res.json({ ok: true })
     })
-    const downstream: RexMiddleware = async () => {
+    const downstream: RiftexMiddleware = async () => {
       downstreamRan = true
     }
     const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })

@@ -28,12 +28,12 @@ to discover, in production, that they accidentally registered a route too late.
 
 ## Decision
 Defer composition until the first request reaches `app.handle()`. Track a
-single `dirty: boolean` field on `RexApp` (see `packages/riftexpress/src/app.ts`).
-Set it `true` in the `RexApp` constructor and on every `use()`, `method()`,
+single `dirty: boolean` field on `RiftexApp` (see `packages/riftexpress/src/app.ts`).
+Set it `true` in the `RiftexApp` constructor and on every `use()`, `method()`,
 `get()`/`post()`/etc. call. At the top of `handle()`:
 
 ```ts
-async handle(ctx: RexContext): Promise<void> {
+async handle(ctx: RiftexContext): Promise<void> {
   if (this.dirty) this.compose()
   // ...
 }

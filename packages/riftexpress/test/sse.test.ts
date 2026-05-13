@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { request as httpRequest, type IncomingMessage } from 'node:http'
 import { NodeAdapter } from '../src/transport/node.ts'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import type { ListeningServer, TransportHooks } from '../src/transport/types.ts'
 import { sse, type SseStream } from '../src/sse/sse.ts'
 import { startKeepAlive } from '../src/sse/keep-alive.ts'
 
 /** Spin up a NodeAdapter on an ephemeral port wired to `dispatch`. */
 async function startServer(
-  dispatch: (ctx: RexContext) => Promise<void> | void,
+  dispatch: (ctx: RiftexContext) => Promise<void> | void,
 ): Promise<ListeningServer> {
   const adapter = new NodeAdapter()
   const hooks: TransportHooks = {
-    acquire: () => new RexContext(),
+    acquire: () => new RiftexContext(),
     release: () => {
       /* no-op */
     },

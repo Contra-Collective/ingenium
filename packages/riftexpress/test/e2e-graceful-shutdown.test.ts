@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rex } from '../src/index.ts'
+import { riftex } from '../src/index.ts'
 
 /** Wait `ms` milliseconds. */
 function delay(ms: number): Promise<void> {
@@ -10,7 +10,7 @@ describe('e2e graceful shutdown', () => {
   it(
     'force-closes a slow request after gracefulTimeoutMs and refuses new connections',
     async () => {
-      const app = rex()
+      const app = riftex()
       app.get('/slow', async () => {
         await delay(200)
         return { ok: true }

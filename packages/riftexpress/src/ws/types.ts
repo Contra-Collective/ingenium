@@ -7,7 +7,7 @@
 import type { IncomingMessage } from 'node:http'
 // Type-only — TypeScript erases this; safe even without `ws` installed.
 import type { WebSocket as WsWebSocket } from 'ws'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /** Re-export the underlying `ws` `WebSocket` type for convenience. */
 export type WebSocket = WsWebSocket
@@ -15,11 +15,11 @@ export type WebSocket = WsWebSocket
 /**
  * Handler invoked when a client successfully upgrades to a WebSocket.
  *
- * `socket` is the `ws.WebSocket` instance. `ctx` is a minimal `RexContext`
+ * `socket` is the `ws.WebSocket` instance. `ctx` is a minimal `RiftexContext`
  * populated from the upgrade `IncomingMessage` — the body / response writers
  * are not meaningful for WS handlers (the upgrade has already happened).
  */
-export type WebSocketHandler = (socket: WsWebSocket, ctx: RexContext) => void | Promise<void>
+export type WebSocketHandler = (socket: WsWebSocket, ctx: RiftexContext) => void | Promise<void>
 
 /** Per-handler options forwarded to `WebSocketServer({ noServer: true, ... })`. */
 export interface WebSocketHandlerOptions {

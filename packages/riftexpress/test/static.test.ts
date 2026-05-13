@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import * as os from 'node:os'
 import { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import { staticMiddleware } from '../src/static/middleware.ts'
 
 let ROOT: string
@@ -16,7 +16,7 @@ const FILES = {
 }
 
 beforeAll(() => {
-  ROOT = mkdtempSync(path.join(os.tmpdir(), 'rex-static-'))
+  ROOT = mkdtempSync(path.join(os.tmpdir(), 'riftex-static-'))
   for (const [name, content] of Object.entries(FILES)) {
     writeFileSync(path.join(ROOT, name), content)
   }
@@ -31,8 +31,8 @@ afterAll(() => {
   rmSync(ROOT, { recursive: true, force: true })
 })
 
-function makeCtx(p: string, headers: Record<string, string> = {}): RexContext {
-  const ctx = new RexContext()
+function makeCtx(p: string, headers: Record<string, string> = {}): RiftexContext {
+  const ctx = new RiftexContext()
   ctx.method = 'GET'
   ctx.path = p
   ctx.url = p
@@ -46,7 +46,7 @@ async function readStream(r: Readable): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
-function bodyAsStream(ctx: RexContext): Readable {
+function bodyAsStream(ctx: RiftexContext): Readable {
   if (ctx._body.kind !== 'stream') throw new Error(`expected stream body, got ${ctx._body.kind}`)
   return ctx._body.data
 }

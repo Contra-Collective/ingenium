@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { rex } from '../src/index.ts'
+import { riftex } from '../src/index.ts'
 import { enableWebSockets } from '../src/ws/index.ts'
 import type { ListeningServer } from '../src/transport/types.ts'
 
@@ -56,7 +56,7 @@ function once<T = Buffer>(c: WsClient, event: 'message' | 'close'): Promise<T> {
 
 describe.skipIf(!hasWs)('riftexpress/ws', () => {
   it('echoes messages on app.ws("/echo", ...)', async () => {
-    const app = rex()
+    const app = riftex()
     enableWebSockets(app)
     app.ws('/echo', (sock) => {
       sock.on('message', (m) => sock.send(m))
@@ -76,7 +76,7 @@ describe.skipIf(!hasWs)('riftexpress/ws', () => {
   })
 
   it('routes multiple paths independently', async () => {
-    const app = rex()
+    const app = riftex()
     enableWebSockets(app)
     app
       .ws('/a', (sock) => sock.send('A'))
@@ -100,7 +100,7 @@ describe.skipIf(!hasWs)('riftexpress/ws', () => {
   })
 
   it('destroys the socket on unknown path (no handler => close)', async () => {
-    const app = rex()
+    const app = riftex()
     enableWebSockets(app)
     app.ws('/known', () => { /* never reached in this test */ })
 
@@ -123,7 +123,7 @@ describe.skipIf(!hasWs)('riftexpress/ws', () => {
   })
 
   it('app.close() tears down the WebSocketServer cleanly', async () => {
-    const app = rex()
+    const app = riftex()
     enableWebSockets(app)
     app.ws('/echo', (sock) => {
       sock.on('message', (m) => sock.send(m))

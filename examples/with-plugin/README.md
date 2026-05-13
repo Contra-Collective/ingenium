@@ -4,7 +4,7 @@ A minimal RiftExpress server that demonstrates the plugin API.
 
 What it shows:
 
-- Defining a plugin with the `RexPlugin<Opts>` type signature
+- Defining a plugin with the `RiftexPlugin<Opts>` type signature
 - Registering it via `app.register(plugin, opts)`
 - Adding an `onRequest` lifecycle hook for token validation
 - Lazy `app.decorate('user', ...)` — factory runs the first time `ctx.user` is read

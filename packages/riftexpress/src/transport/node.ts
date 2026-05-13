@@ -1,12 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
 import type { CloseOptions, ListeningServer, Transport, TransportHooks } from './types.ts'
 
 /**
  * Node.js `node:http` transport. Owns a single `http.Server`; on each
- * request, populates a pooled `RexContext` directly from the
+ * request, populates a pooled `RiftexContext` directly from the
  * `IncomingMessage` (no WinterCG translation), awaits dispatch, then writes
  * the context's response state to the `ServerResponse`.
  */
@@ -95,7 +95,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, hooks: T
   }
 }
 
-function populateContext(ctx: RexContext, req: IncomingMessage): void {
+function populateContext(ctx: RiftexContext, req: IncomingMessage): void {
   ctx.method = (req.method ?? 'GET') as HttpMethod
   ctx.url = req.url ?? '/'
   // Split path / query without allocating a URL object.
@@ -120,7 +120,7 @@ function populateContext(ctx: RexContext, req: IncomingMessage): void {
   ctx.body._attach(req, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
-function writeResponse(ctx: RexContext, res: ServerResponse): void {
+function writeResponse(ctx: RiftexContext, res: ServerResponse): void {
   res.statusCode = ctx._statusCode
 
   for (const name in ctx._headers) {

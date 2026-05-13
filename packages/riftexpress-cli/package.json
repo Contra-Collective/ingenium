@@ -4,7 +4,7 @@
   "description": "Project scaffolder CLI for RiftExpress.",
   "type": "module",
   "bin": {
-    "rex": "./bin/rex.mjs"
+    "riftex": "./bin/riftex.mjs"
   },
   "main": "./src/cli.ts",
   "exports": {

@@ -31,14 +31,14 @@ function runRex(args: string[], cwd?: string): RunResult {
 let workDir: string
 
 beforeAll(() => {
-  workDir = mkdtempSync(join(tmpdir(), 'rex-cli-test-'))
+  workDir = mkdtempSync(join(tmpdir(), 'riftex-cli-test-'))
 })
 
 afterAll(() => {
   rmSync(workDir, { recursive: true, force: true })
 })
 
-describe('rex --version / -v', () => {
+describe('riftex --version / -v', () => {
   it('prints package version', () => {
     const pkg = JSON.parse(readFileSync(PKG_PATH, 'utf8')) as { version: string }
     const out = runRex(['--version'])
@@ -51,12 +51,12 @@ describe('rex --version / -v', () => {
   })
 })
 
-describe('rex --help / -h', () => {
+describe('riftex --help / -h', () => {
   it('prints usage', () => {
     const out = runRex(['--help'])
     expect(out.status).toBe(0)
     expect(out.stdout).toContain('Usage:')
-    expect(out.stdout).toContain('rex new')
+    expect(out.stdout).toContain('riftex new')
     expect(out.stdout).toContain('--bun')
     expect(out.stdout).toContain('--minimal')
   })
@@ -74,7 +74,7 @@ describe('rex --help / -h', () => {
   })
 })
 
-describe('rex routes', () => {
+describe('riftex routes', () => {
   it('reports the placeholder message', () => {
     const out = runRex(['routes'])
     expect(out.status).toBe(0)
@@ -82,7 +82,7 @@ describe('rex routes', () => {
   })
 })
 
-describe('rex new <name> (default template)', () => {
+describe('riftex new <name> (default template)', () => {
   it('scaffolds a full project', () => {
     const out = runRex(['new', 'myapp'], workDir)
     expect(out.status).toBe(0)
@@ -113,7 +113,7 @@ describe('rex new <name> (default template)', () => {
   })
 })
 
-describe('rex new <name> --minimal', () => {
+describe('riftex new <name> --minimal', () => {
   it('scaffolds a minimal project', () => {
     const out = runRex(['new', 'minapp', '--minimal'], workDir)
     expect(out.status).toBe(0)
@@ -126,7 +126,7 @@ describe('rex new <name> --minimal', () => {
   })
 })
 
-describe('rex new <name> --bun', () => {
+describe('riftex new <name> --bun', () => {
   it('scaffolds a bun project', () => {
     const out = runRex(['new', 'bunapp', '--bun'], workDir)
     expect(out.status).toBe(0)
@@ -147,7 +147,7 @@ describe('rex new <name> --bun', () => {
   })
 })
 
-describe('rex new — overwrite protection', () => {
+describe('riftex new — overwrite protection', () => {
   it('refuses to overwrite an existing dir', () => {
     const target = join(workDir, 'existing')
     mkdirSync(target, { recursive: true })
@@ -169,7 +169,7 @@ describe('rex new — overwrite protection', () => {
   })
 })
 
-describe('rex <unknown>', () => {
+describe('riftex <unknown>', () => {
   it('errors with a non-zero exit code', () => {
     const out = runRex(['frobnicate'])
     expect(out.status).not.toBe(0)
@@ -177,7 +177,7 @@ describe('rex <unknown>', () => {
   })
 })
 
-describe('rex new — missing name', () => {
+describe('riftex new — missing name', () => {
   it('errors and exits 2', () => {
     const out = runRex(['new'])
     expect(out.status).toBe(2)

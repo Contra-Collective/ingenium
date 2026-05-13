@@ -1,6 +1,6 @@
-import type { RexContext, RexMiddleware } from 'riftexpress'
-import { createReqShim, syncReqStateBack, type RexReqShim } from './req-shim.ts'
-import { createResShim, type RexResShim } from './res-shim.ts'
+import type { RiftexContext, RiftexMiddleware } from 'riftexpress'
+import { createReqShim, syncReqStateBack, type RiftexReqShim } from './req-shim.ts'
+import { createResShim, type RiftexResShim } from './res-shim.ts'
 
 /**
  * Express-style middleware signature. We use loose `any` here on purpose:
@@ -19,14 +19,14 @@ export type ExpressMiddleware = (req: any, res: any, next: (err?: unknown) => vo
  * Behavior:
  *  - If the middleware writes the response (`res.json/send/end/writeHead`),
  *    the RiftExpress chain is short-circuited (we do NOT call `next()`).
- *  - If the middleware calls `next()` without writing, the Rex chain continues.
+ *  - If the middleware calls `next()` without writing, the Riftex chain continues.
  *  - If the middleware calls `next(err)`, the wrapper rejects with that error
  *    so it flows to the global onError boundary.
  */
-export function expressCompat(middleware: ExpressMiddleware): RexMiddleware {
-  return async (ctx: RexContext, next: () => Promise<void>): Promise<void> => {
-    const req: RexReqShim = createReqShim(ctx)
-    const res: RexResShim = createResShim(ctx)
+export function expressCompat(middleware: ExpressMiddleware): RiftexMiddleware {
+  return async (ctx: RiftexContext, next: () => Promise<void>): Promise<void> => {
+    const req: RiftexReqShim = createReqShim(ctx)
+    const res: RiftexResShim = createResShim(ctx)
 
     let nextCalled = false
     let nextErr: unknown = undefined
@@ -67,7 +67,7 @@ export function expressCompat(middleware: ExpressMiddleware): RexMiddleware {
     })
 
     // Mirror any req.* mutations (e.g. req.user set by an auth middleware)
-    // back to ctx.state for downstream Rex middleware.
+    // back to ctx.state for downstream Riftex middleware.
     syncReqStateBack(req, ctx)
 
     if (nextErr !== undefined && nextErr !== null) {

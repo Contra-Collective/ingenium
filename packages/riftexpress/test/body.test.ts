@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RexBody } from '../src/context/body.ts'
-import { RexBadRequestError, RexPayloadTooLargeError, RexValidationError } from '../src/errors.ts'
+import { RiftexBody } from '../src/context/body.ts'
+import { RiftexBadRequestError, RiftexPayloadTooLargeError, RiftexValidationError } from '../src/errors.ts'
 
-const attach = (body: RexBody, source: Readable | null, contentLength?: number, contentType?: string) => {
+const attach = (body: RiftexBody, source: Readable | null, contentLength?: number, contentType?: string) => {
   body._attach(source, contentType, contentLength)
 }
 
-describe('RexBody', () => {
+describe('RiftexBody', () => {
   it('buffer() reads all chunks from the stream', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('hello '), Buffer.from('world')]))
     const buf = await body.buffer()
     expect(buf).toBeInstanceOf(Buffer)
@@ -18,26 +18,26 @@ describe('RexBody', () => {
   })
 
   it('text() decodes UTF-8', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('héllo 🌍', 'utf8')]))
     expect(await body.text()).toBe('héllo 🌍')
   })
 
   it('json() parses JSON', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('{"a":1,"b":[2,3]}')]))
     const parsed = await body.json<{ a: number; b: number[] }>()
     expect(parsed).toEqual({ a: 1, b: [2, 3] })
   })
 
-  it('json() throws RexBadRequestError on malformed JSON', async () => {
-    const body = new RexBody()
+  it('json() throws RiftexBadRequestError on malformed JSON', async () => {
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('{not json')]))
-    await expect(body.json()).rejects.toBeInstanceOf(RexBadRequestError)
+    await expect(body.json()).rejects.toBeInstanceOf(RiftexBadRequestError)
   })
 
-  it('json(schema) with safeParse-style schema throws RexValidationError on failure', async () => {
-    const body = new RexBody()
+  it('json(schema) with safeParse-style schema throws RiftexValidationError on failure', async () => {
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('{"age":"NaN"}')]))
     const schema = {
       safeParse(input: unknown) {
@@ -55,13 +55,13 @@ describe('RexBody', () => {
       await body.json(schema)
       throw new Error('should have thrown')
     } catch (err) {
-      expect(err).toBeInstanceOf(RexValidationError)
-      expect((err as RexValidationError).fields).toEqual({ age: 'Expected number' })
+      expect(err).toBeInstanceOf(RiftexValidationError)
+      expect((err as RiftexValidationError).fields).toEqual({ age: 'Expected number' })
     }
   })
 
   it('json(schema) with parse-style schema validates successfully', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('{"name":"alice"}')]))
     const schema = {
       parse(input: unknown): { name: string } {
@@ -74,56 +74,56 @@ describe('RexBody', () => {
     expect(parsed).toEqual({ name: 'alice' })
   })
 
-  it('json(schema) with parse-style schema throws RexValidationError on throw', async () => {
-    const body = new RexBody()
+  it('json(schema) with parse-style schema throws RiftexValidationError on throw', async () => {
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('{}')]))
     const schema = {
       parse(): never {
         throw new Error('name required')
       },
     }
-    await expect(body.json(schema)).rejects.toBeInstanceOf(RexValidationError)
+    await expect(body.json(schema)).rejects.toBeInstanceOf(RiftexValidationError)
   })
 
   it('urlencoded() parses key=value form bodies', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('a=1&b=hello%20world&c=')]))
     const parsed = await body.urlencoded()
     expect(parsed).toEqual({ a: '1', b: 'hello world', c: '' })
   })
 
-  it('throws RexPayloadTooLargeError immediately when content-length exceeds maxBytes', async () => {
-    const body = new RexBody()
+  it('throws RiftexPayloadTooLargeError immediately when content-length exceeds maxBytes', async () => {
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('aaaaaaaaaa')]), 10)
-    await expect(body.buffer(5)).rejects.toBeInstanceOf(RexPayloadTooLargeError)
+    await expect(body.buffer(5)).rejects.toBeInstanceOf(RiftexPayloadTooLargeError)
   })
 
-  it('throws RexPayloadTooLargeError mid-stream when stream exceeds without content-length', async () => {
-    const body = new RexBody()
+  it('throws RiftexPayloadTooLargeError mid-stream when stream exceeds without content-length', async () => {
+    const body = new RiftexBody()
     // No content-length passed → the limiter Transform must catch it.
     const chunks = [Buffer.alloc(4, 'a'), Buffer.alloc(4, 'b'), Buffer.alloc(4, 'c')]
     attach(body, Readable.from(chunks), undefined)
-    await expect(body.buffer(8)).rejects.toBeInstanceOf(RexPayloadTooLargeError)
+    await expect(body.buffer(8)).rejects.toBeInstanceOf(RiftexPayloadTooLargeError)
   })
 
-  it('stream() throws RexBadRequestError if body already consumed', async () => {
-    const body = new RexBody()
+  it('stream() throws RiftexBadRequestError if body already consumed', async () => {
+    const body = new RiftexBody()
     attach(body, Readable.from([Buffer.from('x')]))
     await body.text()
-    expect(() => body.stream()).toThrow(RexBadRequestError)
+    expect(() => body.stream()).toThrow(RiftexBadRequestError)
   })
 
   it('stream() returns the underlying Readable on first call', () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     const src = Readable.from([Buffer.from('x')])
     attach(body, src)
     expect(body.stream()).toBe(src)
     // second call should now throw
-    expect(() => body.stream()).toThrow(RexBadRequestError)
+    expect(() => body.stream()).toThrow(RiftexBadRequestError)
   })
 
   it('buffer() returns empty Buffer when no source attached', async () => {
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, null)
     const buf = await body.buffer()
     expect(buf).toBeInstanceOf(Buffer)

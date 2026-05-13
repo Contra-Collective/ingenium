@@ -9,7 +9,7 @@
 
 import type { Server as HttpServer, IncomingMessage } from 'node:http'
 import type { Socket } from 'node:net'
-import { RexContext } from '../context/context.ts'
+import { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
 import type {
   WebSocketHandler,
@@ -33,7 +33,7 @@ export async function peerHasWs(): Promise<boolean> {
 
 /**
  * Build a registrar bound to an app. The registrar is intentionally
- * decoupled from `RexApp` — the app calls `add()` from `app.ws()`, and
+ * decoupled from `RiftexApp` — the app calls `add()` from `app.ws()`, and
  * `enableWebSockets()` (or the app's `listen()` integration) calls `attach()`
  * once the underlying `http.Server` is created.
  */
@@ -161,12 +161,12 @@ export function createWebSocketRegistrar(): WsRegistrar {
 }
 
 /**
- * Build a minimal `RexContext` for a WebSocket handler. We don't run the
+ * Build a minimal `RiftexContext` for a WebSocket handler. We don't run the
  * full request pipeline (no middleware, no decorators) because the upgrade
  * has already taken place — the handler owns the socket from here.
  */
-function buildMinimalContext(req: IncomingMessage, path: string): RexContext {
-  const ctx = new RexContext()
+function buildMinimalContext(req: IncomingMessage, path: string): RiftexContext {
+  const ctx = new RiftexContext()
   ctx.method = (req.method ?? 'GET') as HttpMethod
   ctx.url = req.url ?? '/'
   ctx.path = path

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import { rateLimit } from '../src/rate-limit/middleware.ts'
 import { MemoryStore } from '../src/rate-limit/store.ts'
 import type { HttpMethod } from '../src/router/types.ts'
 
-function makeCtx(headers: Record<string, string> = {}): RexContext {
-  const ctx = new RexContext()
+function makeCtx(headers: Record<string, string> = {}): RiftexContext {
+  const ctx = new RiftexContext()
   ctx.method = 'GET' as HttpMethod
   ctx.path = '/'
   ctx.url = '/'

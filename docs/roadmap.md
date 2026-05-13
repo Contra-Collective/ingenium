@@ -2,19 +2,19 @@
 
 ## Shipped in v0.0.1
 
-- `rex()` app factory with lazy-composed middleware pipeline and `app.compose()` pre-warm.
+- `riftex()` app factory with lazy-composed middleware pipeline and `app.compose()` pre-warm.
 - `Router()` with prefix mounting and nested routers.
-- `RexContext` request/response surface (params, query, headers, `state`, status/header setters, terminal writers `json` / `text` / `html` / `send` / `redirect` / `stream`).
-- `RexBody` lazy parsers: `json` (with optional Zod-like schema + `maxBytes`), `text`, `urlencoded`, `buffer`, `stream`.
+- `RiftexContext` request/response surface (params, query, headers, `state`, status/header setters, terminal writers `json` / `text` / `html` / `send` / `redirect` / `stream`).
+- `RiftexBody` lazy parsers: `json` (with optional Zod-like schema + `maxBytes`), `text`, `urlencoded`, `buffer`, `stream`.
 - Handler return-value reflection (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204).
 - Path syntax with `:param`, `:param?`, `*wild`, deterministic precedence (static > param > wildcard).
-- Error class hierarchy (`RexError` and friends) with default JSON error boundary; `app.onError` override + re-throw delegation.
+- Error class hierarchy (`RiftexError` and friends) with default JSON error boundary; `app.onError` override + re-throw delegation.
 - Express compat shim (`expressCompat`) for pure-function middleware (cors, helmet, etc.).
 - Node HTTP adapter with `app.listen(port, host?)` returning `{ port, close }`.
 - **Bun adapter** (`riftexpress-bun`) — `BunAdapter` transport for `Bun.serve()` sharing the same `app.handle(ctx)` dispatch entry, with a Web-Streams ↔ `node:stream` bridge.
 - **Plugin system** — `app.register(plugin, opts?)` with lifecycle hooks (`onRoute`, `onCompose`, `onRequest`, `onResponse`, `onError`) and per-request decorators (`app.decorate` lazy, `app.decorateRequest` eager). Hot path short-circuits when nothing is registered.
-- **Static file middleware** — `rex.static(root, opts?)` with ETag, conditional GET, range requests, MIME detection, `index` / `extensions` / `dotfiles` / `maxAge` options.
-- **CLI scaffolder** — `rex new <name> [--bun|--minimal]` (`riftexpress-cli`) for bootstrapping new apps.
+- **Static file middleware** — `riftex.static(root, opts?)` with ETag, conditional GET, range requests, MIME detection, `index` / `extensions` / `dotfiles` / `maxAge` options.
+- **CLI scaffolder** — `riftex new <name> [--bun|--minimal]` (`riftexpress-cli`) for bootstrapping new apps.
 - **ADR docs** — `docs/adr/0001`–`0005` covering the load-bearing decisions (radix-trie router, lazy composition with dirty bit, return-value reflection, context pool, compat shim scope).
 
 ---

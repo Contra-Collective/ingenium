@@ -3,10 +3,10 @@
  *
  * # Usage
  * ```ts
- * import { rex } from 'riftexpress'
+ * import { riftex } from 'riftexpress'
  * import { enableWebSockets } from 'riftexpress/ws'
  *
- * const app = rex()
+ * const app = riftex()
  * enableWebSockets(app)
  * app.ws('/echo', (sock) => {
  *   sock.on('message', (m) => sock.send(m))
@@ -17,17 +17,17 @@
  * # Why a monkey-patch?
  * `enableWebSockets(app)` augments the app instance with `app.ws()` and
  * wraps `app.listen()` so the registrar gets attached to the underlying
- * `http.Server` once it's bound. We chose this over extending `RexApp` to
+ * `http.Server` once it's bound. We chose this over extending `RiftexApp` to
  * avoid pulling `./ws/middleware.ts` into the core import graph (which would
  * create a soft dep on `ws` types from every `app.ts` consumer). This is a
  * known pattern in WS-extending frameworks (e.g. `express-ws`).
  *
  * The trade-off: TypeScript can't statically see `app.ws` unless the
  * augmentation below is loaded. Importing this module both registers the
- * runtime patch AND adds the type augmentation to the global `RexApp`.
+ * runtime patch AND adds the type augmentation to the global `RiftexApp`.
  */
 
-import type { RexApp } from '../app.ts'
+import type { RiftexApp } from '../app.ts'
 import type { ListeningServer, Transport } from '../transport/types.ts'
 import { createWebSocketRegistrar, peerHasWs } from './middleware.ts'
 import { WsNodeAdapter } from './ws-node-adapter.ts'
@@ -48,12 +48,12 @@ export type {
 export { createWebSocketRegistrar, peerHasWs } from './middleware.ts'
 
 // ───── Type augmentation ────────────────────────────────────────────────────
-// Declared on RexApp so `app.ws(...)` and `app.upgradeWith(...)` typecheck
+// Declared on RiftexApp so `app.ws(...)` and `app.upgradeWith(...)` typecheck
 // for any consumer that imports from 'riftexpress/ws'.
 declare module '../app.ts' {
-  interface RexApp {
-    ws(path: string, handler: WebSocketHandler, options?: WebSocketHandlerOptions): RexApp
-    upgradeWith(integrator: WsIntegrator): RexApp
+  interface RiftexApp {
+    ws(path: string, handler: WebSocketHandler, options?: WebSocketHandlerOptions): RiftexApp
+    upgradeWith(integrator: WsIntegrator): RiftexApp
   }
 }
 
@@ -64,7 +64,7 @@ interface WsAppState {
   enabled: true
 }
 
-const APP_STATE: WeakMap<RexApp, WsAppState> = new WeakMap()
+const APP_STATE: WeakMap<RiftexApp, WsAppState> = new WeakMap()
 
 /** Options for `enableWebSockets`. Reserved for future use. */
 export interface EnableWebSocketsOptions {
@@ -77,10 +77,10 @@ export interface EnableWebSocketsOptions {
 }
 
 /**
- * Augment a `RexApp` with WebSocket support. Idempotent — calling more than
+ * Augment a `RiftexApp` with WebSocket support. Idempotent — calling more than
  * once on the same app is a no-op.
  */
-export function enableWebSockets(app: RexApp, opts: EnableWebSocketsOptions = {}): void {
+export function enableWebSockets(app: RiftexApp, opts: EnableWebSocketsOptions = {}): void {
   if (APP_STATE.has(app)) return
 
   const registrar = createWebSocketRegistrar()
@@ -100,26 +100,26 @@ export function enableWebSockets(app: RexApp, opts: EnableWebSocketsOptions = {}
 
   // Attach the new methods. We assign with a cast because the augmentation
   // above only exists at the type layer.
-  ;(app as unknown as { ws: RexApp['ws'] }).ws = function (
+  ;(app as unknown as { ws: RiftexApp['ws'] }).ws = function (
     path: string,
     handler: WebSocketHandler,
     options?: WebSocketHandlerOptions,
-  ): RexApp {
+  ): RiftexApp {
     state.registrar.add(path, handler, options)
     return app
   }
 
-  ;(app as unknown as { upgradeWith: RexApp['upgradeWith'] }).upgradeWith = function (
+  ;(app as unknown as { upgradeWith: RiftexApp['upgradeWith'] }).upgradeWith = function (
     integrator: WsIntegrator,
-  ): RexApp {
+  ): RiftexApp {
     state.integrators.push(integrator)
     return app
   }
 
   // Swap in a WebSocket-aware Node transport. We do this via bracket-access
-  // because `RexApp#transport` is `private` (TypeScript-only — `private`
+  // because `RiftexApp#transport` is `private` (TypeScript-only — `private`
   // doesn't actually hide the field at runtime). If the user injected a
-  // custom transport via `RexAppOptions.transport`, we leave it alone and
+  // custom transport via `RiftexAppOptions.transport`, we leave it alone and
   // log a warning — they're responsible for calling `registrar.attach()`
   // themselves via `app.upgradeWith(...)`.
   const appAny = app as unknown as { transport: Transport }
@@ -142,7 +142,7 @@ export function enableWebSockets(app: RexApp, opts: EnableWebSocketsOptions = {}
   // down its WebSocketServers first — otherwise `server.close()` hangs
   // forever waiting on the open WS sockets.
   const originalListen = app.listen.bind(app)
-  ;(app as unknown as { listen: RexApp['listen'] }).listen = async function (
+  ;(app as unknown as { listen: RiftexApp['listen'] }).listen = async function (
     port: number,
     host?: string,
   ): Promise<ListeningServer> {

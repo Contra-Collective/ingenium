@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import {
   sessionMiddleware,
   parseCookieHeader,
@@ -11,19 +11,19 @@ import type { Session } from '../src/session/types.ts'
 
 // ───── Helpers ──────────────────────────────────────────────────────────────
 
-function makeCtx(headers: Record<string, string> = {}): RexContext & { session: Session } {
-  const ctx = new RexContext()
+function makeCtx(headers: Record<string, string> = {}): RiftexContext & { session: Session } {
+  const ctx = new RiftexContext()
   ctx.method = 'GET'
   ctx.path = '/'
   ctx.url = '/'
   ctx.headers = headers
-  return ctx as RexContext & { session: Session }
+  return ctx as RiftexContext & { session: Session }
 }
 
 const noop = async () => {}
 
 /** Pull the first (or only) Set-Cookie value emitted on the context. */
-function getSetCookie(ctx: RexContext): string | undefined {
+function getSetCookie(ctx: RiftexContext): string | undefined {
   const v = ctx.getHeader('set-cookie')
   if (v === undefined) return undefined
   return Array.isArray(v) ? v[0] : v
@@ -65,8 +65,8 @@ describe('parseCookieHeader', () => {
 
 describe('serializeCookie', () => {
   it('emits HttpOnly + SameSite=Lax + Path=/ by default', () => {
-    const out = serializeCookie('rex.sid', 'abc')
-    expect(out).toContain('rex.sid=abc')
+    const out = serializeCookie('riftex.sid', 'abc')
+    expect(out).toContain('riftex.sid=abc')
     expect(out).toContain('Path=/')
     expect(out).toContain('HttpOnly')
     expect(out).toContain('SameSite=Lax')
@@ -101,7 +101,7 @@ describe('sessionMiddleware', () => {
     expect(typeof ctx.session.id).toBe('string')
     const sc = getSetCookie(ctx)
     expect(sc).toBeDefined()
-    const value = readCookieValue(sc!, 'rex.sid')!
+    const value = readCookieValue(sc!, 'riftex.sid')!
     const dot = value.lastIndexOf('.')
     const id = value.slice(0, dot)
     const sig = value.slice(dot + 1)
@@ -118,7 +118,7 @@ describe('sessionMiddleware', () => {
     })
     const sc = getSetCookie(ctx)
     expect(sc).toBeDefined()
-    const value = readCookieValue(sc!, 'rex.sid')
+    const value = readCookieValue(sc!, 'riftex.sid')
     expect(value).toBeTruthy()
     // Format: <id>.<sig>
     const dot = value!.lastIndexOf('.')
@@ -141,11 +141,11 @@ describe('sessionMiddleware', () => {
     await mw(ctx1, async () => {
       ctx1.session.set('count', 1)
     })
-    const cookieValue = readCookieValue(getSetCookie(ctx1)!, 'rex.sid')!
+    const cookieValue = readCookieValue(getSetCookie(ctx1)!, 'riftex.sid')!
     const firstId = ctx1.session.id
 
     // Round 2
-    const ctx2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(cookieValue)}` })
+    const ctx2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(cookieValue)}` })
     await mw(ctx2, noop)
     expect(ctx2.session.id).toBe(firstId)
     expect(ctx2.session.get('count')).toBe(1)
@@ -156,7 +156,7 @@ describe('sessionMiddleware', () => {
     const mw = sessionMiddleware({ secret: 'k', store })
     // Pre-populate a session and steal its id, then forge a bogus signature.
     await store.set('stolen-id', { admin: true }, 60)
-    const ctx = makeCtx({ cookie: `rex.sid=${encodeURIComponent('stolen-id.notavalidsig')}` })
+    const ctx = makeCtx({ cookie: `riftex.sid=${encodeURIComponent('stolen-id.notavalidsig')}` })
     await mw(ctx, noop)
     expect(ctx.session.id).not.toBe('stolen-id')
     expect(ctx.session.get('admin')).toBeUndefined()
@@ -174,12 +174,12 @@ describe('sessionMiddleware', () => {
     await mw(c1, async () => {
       c1.session.set('x', 1)
     })
-    const cookieValue = readCookieValue(getSetCookie(c1)!, 'rex.sid')!
+    const cookieValue = readCookieValue(getSetCookie(c1)!, 'riftex.sid')!
     setSpy.mockClear()
     touchSpy.mockClear()
 
     // Read-only request — should not write or touch.
-    const c2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(cookieValue)}` })
+    const c2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(cookieValue)}` })
     await mw(c2, noop)
     expect(setSpy).not.toHaveBeenCalled()
     expect(touchSpy).not.toHaveBeenCalled()
@@ -195,10 +195,10 @@ describe('sessionMiddleware', () => {
     await mw(c1, async () => {
       c1.session.set('x', 1)
     })
-    const cookieValue = readCookieValue(getSetCookie(c1)!, 'rex.sid')!
+    const cookieValue = readCookieValue(getSetCookie(c1)!, 'riftex.sid')!
     touchSpy.mockClear()
 
-    const c2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(cookieValue)}` })
+    const c2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(cookieValue)}` })
     await mw(c2, noop)
     expect(touchSpy).toHaveBeenCalledTimes(1)
     const sc = getSetCookie(c2)
@@ -214,11 +214,11 @@ describe('sessionMiddleware', () => {
     await mw(c1, async () => {
       c1.session.set('user', 'alice')
     })
-    const cookieValue = readCookieValue(getSetCookie(c1)!, 'rex.sid')!
+    const cookieValue = readCookieValue(getSetCookie(c1)!, 'riftex.sid')!
     const id = ctxIdFromCookie(cookieValue)
     expect(await store.get(id)).not.toBeNull()
 
-    const c2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(cookieValue)}` })
+    const c2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(cookieValue)}` })
     await mw(c2, async () => {
       await c2.session.destroy()
     })
@@ -235,10 +235,10 @@ describe('sessionMiddleware', () => {
     await mw(c1, async () => {
       c1.session.set('user', 'bob')
     })
-    const cookieValue = readCookieValue(getSetCookie(c1)!, 'rex.sid')!
+    const cookieValue = readCookieValue(getSetCookie(c1)!, 'riftex.sid')!
     const oldId = ctxIdFromCookie(cookieValue)
 
-    const c2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(cookieValue)}` })
+    const c2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(cookieValue)}` })
     let newId: string | undefined
     await mw(c2, async () => {
       await c2.session.regenerate()
@@ -251,7 +251,7 @@ describe('sessionMiddleware', () => {
     expect(await store.get(newId!)).toEqual({ user: 'bob' })
     // Cookie now carries the new id
     const sc = getSetCookie(c2)!
-    expect(readCookieValue(sc, 'rex.sid')!.startsWith(`${newId}.`)).toBe(true)
+    expect(readCookieValue(sc, 'riftex.sid')!.startsWith(`${newId}.`)).toBe(true)
   })
 
   it('secret rotation: cookie signed with secret[1] verifies AND is re-signed with secret[0]', async () => {
@@ -262,12 +262,12 @@ describe('sessionMiddleware', () => {
     await old(c1, async () => {
       c1.session.set('v', 1)
     })
-    const oldCookie = readCookieValue(getSetCookie(c1)!, 'rex.sid')!
+    const oldCookie = readCookieValue(getSetCookie(c1)!, 'riftex.sid')!
     const oldSig = oldCookie.slice(oldCookie.lastIndexOf('.') + 1)
 
     // Phase 2 — middleware now rotates: new key is primary, old still valid.
     const rotated = sessionMiddleware({ secret: ['newkey', 'oldkey'], store })
-    const c2 = makeCtx({ cookie: `rex.sid=${encodeURIComponent(oldCookie)}` })
+    const c2 = makeCtx({ cookie: `riftex.sid=${encodeURIComponent(oldCookie)}` })
     await rotated(c2, noop)
 
     // Loaded the same session.
@@ -276,7 +276,7 @@ describe('sessionMiddleware', () => {
     // Re-signed with new key on response (no data change, but secret moved).
     const sc = getSetCookie(c2)
     expect(sc).toBeDefined()
-    const newCookie = readCookieValue(sc!, 'rex.sid')!
+    const newCookie = readCookieValue(sc!, 'riftex.sid')!
     const newSig = newCookie.slice(newCookie.lastIndexOf('.') + 1)
     expect(newSig).not.toBe(oldSig)
     const id = newCookie.slice(0, newCookie.lastIndexOf('.'))

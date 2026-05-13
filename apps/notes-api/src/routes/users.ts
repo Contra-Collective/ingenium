@@ -2,7 +2,7 @@
 
 import { randomUUID, randomBytes } from 'node:crypto'
 import { z } from 'zod'
-import { RexBadRequestError, Router } from 'riftexpress'
+import { RiftexBadRequestError, Router } from 'riftexpress'
 import { prepared, type DB } from '../db.ts'
 import type { AuthUser } from '../auth.ts'
 
@@ -38,7 +38,7 @@ export function usersRouter(db: DB): Router {
     const input = await ctx.body.json(SignupSchema)
 
     const existing = stmts.findUserByEmail.get(input.email) as AuthUser | undefined
-    if (existing) throw new RexBadRequestError('Email already registered')
+    if (existing) throw new RiftexBadRequestError('Email already registered')
 
     const id = `usr_${randomUUID()}`
     const now = Date.now()
@@ -62,7 +62,7 @@ export function usersRouter(db: DB): Router {
   r.post('/tokens', async (ctx) => {
     const input = await ctx.body.json(TokenSchema)
     const user = stmts.findUserByEmail.get(input.email) as AuthUser | undefined
-    if (!user) throw new RexBadRequestError('No account for that email')
+    if (!user) throw new RiftexBadRequestError('No account for that email')
 
     const token = newToken()
     stmts.insertToken.run(token, user.id, Date.now())

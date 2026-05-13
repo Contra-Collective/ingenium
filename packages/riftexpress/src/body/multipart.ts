@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { RexBadRequestError, RexPayloadTooLargeError } from '../errors.ts'
+import { RiftexBadRequestError, RiftexPayloadTooLargeError } from '../errors.ts'
 import type { MultipartFile, MultipartOptions, MultipartResult } from './multipart-types.ts'
 
 /** Default per-file cap: 10 MiB. */
@@ -20,12 +20,12 @@ const DASH_DASH = Buffer.from('--')
  */
 function extractBoundary(contentType: string | undefined): string {
   if (!contentType) {
-    throw new RexBadRequestError('Content-Type header missing')
+    throw new RiftexBadRequestError('Content-Type header missing')
   }
   // The mime type itself is case-insensitive.
   const lower = contentType.toLowerCase()
   if (!lower.startsWith('multipart/form-data')) {
-    throw new RexBadRequestError('Content-Type is not multipart/form-data')
+    throw new RiftexBadRequestError('Content-Type is not multipart/form-data')
   }
   // Walk parameters: split on `;` but only after the type. We don't bother with
   // RFC 2231 continuations — boundaries are restricted to a 70-char ASCII subset.
@@ -40,11 +40,11 @@ function extractBoundary(contentType: string | undefined): string {
       value = value.slice(1, -1)
     }
     if (value.length === 0) {
-      throw new RexBadRequestError('multipart boundary is empty')
+      throw new RiftexBadRequestError('multipart boundary is empty')
     }
     return value
   }
-  throw new RexBadRequestError('multipart boundary missing')
+  throw new RiftexBadRequestError('multipart boundary missing')
 }
 
 interface PartHeaders {
@@ -70,7 +70,7 @@ function parsePartHeaders(block: string): PartHeaders {
     if (line.length === 0) continue
     const colon = line.indexOf(':')
     if (colon === -1) {
-      throw new RexBadRequestError('Malformed multipart body: invalid header line')
+      throw new RiftexBadRequestError('Malformed multipart body: invalid header line')
     }
     const headerName = line.slice(0, colon).trim().toLowerCase()
     const headerValue = line.slice(colon + 1).trim()
@@ -81,7 +81,7 @@ function parsePartHeaders(block: string): PartHeaders {
       // First token is the disposition (`form-data`); we only accept that.
       const disposition = params[0]?.trim().toLowerCase()
       if (disposition !== 'form-data') {
-        throw new RexBadRequestError('Malformed multipart body: unsupported Content-Disposition')
+        throw new RiftexBadRequestError('Malformed multipart body: unsupported Content-Disposition')
       }
       for (let i = 1; i < params.length; i++) {
         const p = params[i]!
@@ -102,7 +102,7 @@ function parsePartHeaders(block: string): PartHeaders {
   }
 
   if (name === undefined) {
-    throw new RexBadRequestError('Malformed multipart body: missing form-data name')
+    throw new RiftexBadRequestError('Malformed multipart body: missing form-data name')
   }
   return { name, filename, contentType }
 }
@@ -176,7 +176,7 @@ export function parseMultipart(
 
   let cursor = buffer.indexOf(dashBoundary)
   if (cursor === -1) {
-    throw new RexBadRequestError('Malformed multipart body: opening boundary not found')
+    throw new RiftexBadRequestError('Malformed multipart body: opening boundary not found')
   }
   cursor += dashBoundary.length
 
@@ -189,7 +189,7 @@ export function parseMultipart(
   // anything else is malformed.
   for (;;) {
     if (cursor + 2 > buffer.length) {
-      throw new RexBadRequestError('Malformed multipart body: truncated after boundary')
+      throw new RiftexBadRequestError('Malformed multipart body: truncated after boundary')
     }
     // Final delimiter: `--<boundary>--`
     if (buffer[cursor] === 0x2d && buffer[cursor + 1] === 0x2d) {
@@ -198,14 +198,14 @@ export function parseMultipart(
     }
     // Otherwise expect CRLF before headers.
     if (buffer[cursor] !== 0x0d || buffer[cursor + 1] !== 0x0a) {
-      throw new RexBadRequestError('Malformed multipart body: expected CRLF after boundary')
+      throw new RiftexBadRequestError('Malformed multipart body: expected CRLF after boundary')
     }
     cursor += 2
 
     // Header block ends at the first `\r\n\r\n`.
     const headerEnd = buffer.indexOf(DOUBLE_CRLF, cursor)
     if (headerEnd === -1) {
-      throw new RexBadRequestError('Malformed multipart body: missing header terminator')
+      throw new RiftexBadRequestError('Malformed multipart body: missing header terminator')
     }
     const headerBlock = buffer.slice(cursor, headerEnd).toString('utf8')
     const headers = parsePartHeaders(headerBlock)
@@ -216,7 +216,7 @@ export function parseMultipart(
     const delimiter = Buffer.concat([CRLF, dashBoundary])
     const partEnd = buffer.indexOf(delimiter, cursor)
     if (partEnd === -1) {
-      throw new RexBadRequestError('Malformed multipart body: missing closing boundary')
+      throw new RiftexBadRequestError('Malformed multipart body: missing closing boundary')
     }
 
     const partBody = buffer.slice(cursor, partEnd)
@@ -224,7 +224,7 @@ export function parseMultipart(
     if (headers.filename !== undefined) {
       // File part — apply size + count + mime checks.
       if (partBody.length > maxFileSize) {
-        throw new RexPayloadTooLargeError(
+        throw new RiftexPayloadTooLargeError(
           `File "${headers.filename}" exceeded ${maxFileSize} bytes`,
         )
       }
@@ -232,17 +232,17 @@ export function parseMultipart(
         const mime = (headers.contentType ?? 'application/octet-stream').toLowerCase()
         const ok = allowed.some((prefix) => mime.startsWith(prefix.toLowerCase()))
         if (!ok) {
-          throw new RexBadRequestError('Disallowed mime type')
+          throw new RiftexBadRequestError('Disallowed mime type')
         }
       }
       fileCount++
       if (fileCount > maxFiles) {
-        throw new RexBadRequestError('Too many files')
+        throw new RiftexBadRequestError('Too many files')
       }
     } else {
       fieldCount++
       if (fieldCount > maxFields) {
-        throw new RexBadRequestError('Too many fields')
+        throw new RiftexBadRequestError('Too many fields')
       }
     }
 

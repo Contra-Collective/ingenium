@@ -1,14 +1,14 @@
 // RiftExpress on Bun.
 //
-// The framework is transport-agnostic — `rex({ transport: ... })` lets you
+// The framework is transport-agnostic — `riftex({ transport: ... })` lets you
 // swap the underlying server. `BunAdapter` runs on `Bun.serve()` instead of
-// `node:http`. Same handler surface, same `RexContext`, same return-value
+// `node:http`. Same handler surface, same `RiftexContext`, same return-value
 // reflection. You must run this file with `bun`, not `node`.
 
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { BunAdapter } from 'riftexpress-bun'
 
-const app = rex({ transport: new BunAdapter() })
+const app = riftex({ transport: new BunAdapter() })
 
 app.get('/', () => ({ hello: 'world', runtime: 'bun' }))
 

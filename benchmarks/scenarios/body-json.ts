@@ -1,5 +1,5 @@
 import express from 'express'
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { runBench, printComparison, printHeader } from './_shared.js'
 
 const HOST = '127.0.0.1'
@@ -33,7 +33,7 @@ async function bootExpress(): Promise<{ port: number; close: () => Promise<void>
 }
 
 async function bootRift(): Promise<{ port: number; close: () => Promise<void> }> {
-  const app = rex()
+  const app = riftex()
   app.post('/echo', async (ctx) => {
     const body = await ctx.body.json<{ name?: string }>()
     return { name: body?.name, processedAt: Date.now() }

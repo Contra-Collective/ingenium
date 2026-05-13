@@ -1,5 +1,5 @@
-import type { RexMiddleware } from '../middleware/types.ts'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexMiddleware } from '../middleware/types.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { CorsOptions, CorsOrigin } from './types.ts'
 
 const DEFAULT_METHODS: readonly string[] = [
@@ -15,7 +15,7 @@ const DEFAULT_METHODS: readonly string[] = [
  * Append a value to the `Vary` response header, de-duplicating field names
  * (case-insensitive).
  */
-function appendVary(ctx: RexContext, field: string): void {
+function appendVary(ctx: RiftexContext, field: string): void {
   const existing = ctx.getHeader('vary')
   if (!existing) {
     ctx.set('vary', field)
@@ -41,7 +41,7 @@ function appendVary(ctx: RexContext, field: string): void {
 async function resolveOrigin(
   spec: CorsOrigin,
   reqOrigin: string | undefined,
-  ctx: RexContext,
+  ctx: RiftexContext,
 ): Promise<{ value: string | null; reflected: boolean }> {
   // Static wildcard: never depends on the request, never reflects.
   if (spec === '*') return { value: '*', reflected: false }
@@ -92,10 +92,10 @@ async function resolveOrigin(
  * `Access-Control-Request-Method`).
  *
  * @example
- *   app.use(rex.cors())
- *   app.use(rex.cors({ origin: ['https://app.example.com'], credentials: true }))
+ *   app.use(riftex.cors())
+ *   app.use(riftex.cors({ origin: ['https://app.example.com'], credentials: true }))
  */
-export function corsMiddleware(opts: CorsOptions = {}): RexMiddleware {
+export function corsMiddleware(opts: CorsOptions = {}): RiftexMiddleware {
   const origin: CorsOrigin = opts.origin ?? '*'
   const methods = opts.methods ?? DEFAULT_METHODS
   const allowedHeaders = opts.allowedHeaders
@@ -108,7 +108,7 @@ export function corsMiddleware(opts: CorsOptions = {}): RexMiddleware {
   // forbidden by the CORS spec — browsers reject the response.
   if (credentials && origin === '*') {
     throw new Error(
-      "rex.cors: `credentials: true` is incompatible with `origin: '*'`. " +
+      "riftex.cors: `credentials: true` is incompatible with `origin: '*'`. " +
         'Specify an explicit origin (string, array, regex, or function) instead.',
     )
   }

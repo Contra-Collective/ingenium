@@ -1,6 +1,6 @@
 import type { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RexBadRequestError, RexPayloadTooLargeError, RexValidationError } from '../errors.ts'
+import { RiftexBadRequestError, RiftexPayloadTooLargeError, RiftexValidationError } from '../errors.ts'
 import { createByteLimit } from '../body/limit.ts'
 import { parseMultipart } from '../body/multipart.ts'
 import type { MultipartOptions, MultipartResult } from '../body/multipart-types.ts'
@@ -40,11 +40,11 @@ function standardPathToField(path: StandardIssue['path']): string {
 }
 
 /**
- * Default body size limit for `RexBody.json/text/urlencoded/buffer`.
+ * Default body size limit for `RiftexBody.json/text/urlencoded/buffer`.
  * 100,000 bytes matches Express's `body-parser` default (`'100kb'`),
  * which is the convention every Express app implicitly relies on. Override
  * per-call (`ctx.body.json(undefined, 5_000_000)`) or set a different
- * default by configuring your `rex.json({ limit })` middleware (the
+ * default by configuring your `riftex.json({ limit })` middleware (the
  * middleware is currently a stub — see `body/middleware.ts`).
  */
 const DEFAULT_MAX_BYTES = 100_000
@@ -53,10 +53,10 @@ const DEFAULT_MAX_BYTES = 100_000
  * Lazy body accessor. Bytes are not read until one of the consume methods
  * (`json`, `text`, `urlencoded`, `buffer`, `stream`) is called.
  *
- * One instance is allocated per `RexContext` (pool-bound), so per-request
+ * One instance is allocated per `RiftexContext` (pool-bound), so per-request
  * cost is just a `reset()`.
  */
-export class RexBody {
+export class RiftexBody {
   /** @internal */ _source: Readable | null = null
   /** @internal */ _consumed = false
   /** @internal */ _contentType: string | undefined = undefined
@@ -80,22 +80,22 @@ export class RexBody {
 
   /** Returns the raw request body stream. Throws if already consumed. */
   stream(): Readable {
-    if (this._consumed) throw new RexBadRequestError('Request body already consumed')
-    if (!this._source) throw new RexBadRequestError('Request has no body')
+    if (this._consumed) throw new RiftexBadRequestError('Request body already consumed')
+    if (!this._source) throw new RiftexBadRequestError('Request has no body')
     this._consumed = true
     return this._source
   }
 
   /** Buffers the entire body into a `Buffer`. Honors `maxBytes` (default 1 MiB). */
   async buffer(maxBytes: number = DEFAULT_MAX_BYTES): Promise<Buffer> {
-    if (this._consumed) throw new RexBadRequestError('Request body already consumed')
+    if (this._consumed) throw new RiftexBadRequestError('Request body already consumed')
     if (!this._source) return Buffer.alloc(0)
     this._consumed = true
 
     if (this._contentLength !== undefined && this._contentLength > maxBytes) {
       // Drain source so the connection can be reused.
       this._source.resume()
-      throw new (await import('../errors.ts')).RexPayloadTooLargeError(
+      throw new (await import('../errors.ts')).RiftexPayloadTooLargeError(
         `Request body exceeded ${maxBytes} bytes`,
       )
     }
@@ -123,7 +123,7 @@ export class RexBody {
    *   2. Zod-like `safeParse(input)` — multi-issue
    *   3. Plain `parse(input): T` — throws on failure
    *
-   * Validation failures are normalized into `RexValidationError` with a
+   * Validation failures are normalized into `RiftexValidationError` with a
    * field-level `fields` map (dot-joined paths; empty path → `_`).
    */
   async json<T = unknown>(
@@ -135,7 +135,7 @@ export class RexBody {
     try {
       parsed = text.length === 0 ? null : JSON.parse(text)
     } catch (err) {
-      throw new RexBadRequestError('Invalid JSON', err)
+      throw new RiftexBadRequestError('Invalid JSON', err)
     }
     if (schema) {
       // 1. Standard Schema v1 — most modern, takes precedence.
@@ -147,7 +147,7 @@ export class RexBody {
           for (const issue of result.issues) {
             fields[standardPathToField(issue.path)] = issue.message
           }
-          throw new RexValidationError(fields)
+          throw new RiftexValidationError(fields)
         }
         return result.value as T
       }
@@ -159,7 +159,7 @@ export class RexBody {
           for (const issue of result.error.issues) {
             fields[issue.path.join('.') || '_'] = issue.message
           }
-          throw new RexValidationError(fields)
+          throw new RiftexValidationError(fields)
         }
         return result.data
       }
@@ -167,7 +167,7 @@ export class RexBody {
       try {
         return (schema as ParseSchema<T>).parse(parsed)
       } catch (err) {
-        throw new RexValidationError({ _: (err as Error).message ?? 'validation failed' })
+        throw new RiftexValidationError({ _: (err as Error).message ?? 'validation failed' })
       }
     }
     return parsed as T
@@ -190,12 +190,12 @@ export class RexBody {
    * file in memory.
    *
    * Failure modes:
-   * - Body exceeds `maxBytes` → `RexPayloadTooLargeError`
-   * - Single file exceeds `maxFileSize` → `RexPayloadTooLargeError`
-   * - Too many files / fields → `RexBadRequestError`
-   * - Disallowed mime type → `RexBadRequestError`
-   * - Content-Type isn't `multipart/form-data` or boundary missing → `RexBadRequestError`
-   * - Malformed body → `RexBadRequestError`
+   * - Body exceeds `maxBytes` → `RiftexPayloadTooLargeError`
+   * - Single file exceeds `maxFileSize` → `RiftexPayloadTooLargeError`
+   * - Too many files / fields → `RiftexBadRequestError`
+   * - Disallowed mime type → `RiftexBadRequestError`
+   * - Content-Type isn't `multipart/form-data` or boundary missing → `RiftexBadRequestError`
+   * - Malformed body → `RiftexBadRequestError`
    */
   async multipart(opts: MultipartOptions = {}): Promise<MultipartResult> {
     const contentType = this._contentType
@@ -204,10 +204,10 @@ export class RexBody {
       return parseMultipart(buf, contentType, opts)
     } catch (err) {
       // Preserve framework errors (415/413/400) as-is.
-      if (err instanceof RexPayloadTooLargeError || err instanceof RexBadRequestError) {
+      if (err instanceof RiftexPayloadTooLargeError || err instanceof RiftexBadRequestError) {
         throw err
       }
-      throw new RexBadRequestError('Malformed multipart body', err)
+      throw new RiftexBadRequestError('Malformed multipart body', err)
     }
   }
 }

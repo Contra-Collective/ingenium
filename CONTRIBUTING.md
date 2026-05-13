@@ -35,10 +35,10 @@ This is a workspaces monorepo:
 
 | Path                          | Purpose                                                     |
 | ----------------------------- | ----------------------------------------------------------- |
-| `packages/riftexpress`        | Core framework — `rex()`, `Router`, `RexContext`, plugins   |
+| `packages/riftexpress`        | Core framework — `riftex()`, `Router`, `RiftexContext`, plugins   |
 | `packages/riftexpress-compat` | `expressCompat(mw)` shim for `(req, res, next)` middleware  |
 | `packages/riftexpress-bun`    | `BunAdapter` transport for `Bun.serve()`                    |
-| `packages/riftexpress-cli`    | `rex new` project scaffolder                                |
+| `packages/riftexpress-cli`    | `riftex new` project scaffolder                                |
 | `examples/*`                  | Runnable examples — `basic`, `migrate-from-express`, etc.   |
 | `apps/*`                      | Internal apps used during development                       |
 | `benchmarks/`                 | Comparative throughput harness vs Express, Hono, Fastify    |

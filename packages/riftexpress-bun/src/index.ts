@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import type {
   ListeningServer,
-  RexContext,
+  RiftexContext,
   Transport,
   TransportHooks,
 } from 'riftexpress'
@@ -30,7 +30,7 @@ declare const Bun:
 
 /**
  * `Bun.serve()` transport. Mirrors the contract of `NodeAdapter`: on each
- * request, populate a pooled `RexContext` from the WinterCG `Request`,
+ * request, populate a pooled `RiftexContext` from the WinterCG `Request`,
  * await dispatch, then build a `Response` from the context's response state.
  */
 export class BunAdapter implements Transport {
@@ -74,7 +74,7 @@ async function handleRequest(req: Request, hooks: TransportHooks): Promise<Respo
   }
 }
 
-function populateContext(ctx: RexContext, req: Request): void {
+function populateContext(ctx: RiftexContext, req: Request): void {
   ctx.method = req.method.toUpperCase() as HttpMethod
 
   // Parse path + raw query straight from the URL string — avoid building a
@@ -109,7 +109,7 @@ function populateContext(ctx: RexContext, req: Request): void {
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
-function buildResponse(ctx: RexContext): Response {
+function buildResponse(ctx: RiftexContext): Response {
   const headers = new Headers()
   for (const name in ctx._headers) {
     const value = ctx._headers[name]

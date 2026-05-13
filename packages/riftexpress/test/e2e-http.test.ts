@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Agent, request as httpRequest, type IncomingMessage } from 'node:http'
 import { Readable } from 'node:stream'
-import { rex } from '../src/index.ts'
+import { riftex } from '../src/index.ts'
 import { Router } from '../src/router/router.ts'
-import { RexValidationError } from '../src/errors.ts'
+import { RiftexValidationError } from '../src/errors.ts'
 import type { ListeningServer } from '../src/transport/types.ts'
-import type { RexApp } from '../src/app.ts'
+import type { RiftexApp } from '../src/app.ts'
 
 /** Boot an app on an ephemeral port and return its `ListeningServer` handle. */
-async function start(app: RexApp): Promise<ListeningServer> {
+async function start(app: RiftexApp): Promise<ListeningServer> {
   return app.listen(0, '127.0.0.1')
 }
 
@@ -23,7 +23,7 @@ function url(server: ListeningServer, path: string): string {
 describe('e2e: handler return — string', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', () => 'hello world')
     server = await start(app)
   })
@@ -40,7 +40,7 @@ describe('e2e: handler return — string', () => {
 describe('e2e: handler return — JSON object', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', () => ({ ok: true }))
     server = await start(app)
   })
@@ -61,7 +61,7 @@ describe('e2e: handler return — JSON object', () => {
 describe('e2e: route params', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/users/:id', (ctx) => ({ id: ctx.params.id }))
     server = await start(app)
   })
@@ -77,7 +77,7 @@ describe('e2e: route params', () => {
 describe('e2e: POST /echo with JSON body', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.post('/echo', async (ctx) => {
       const body = await ctx.body.json()
       return body
@@ -101,7 +101,7 @@ describe('e2e: POST /echo with JSON body', () => {
 describe('e2e: POST with content-length 0', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     let ran = false
     app.post('/', () => {
       ran = true
@@ -125,7 +125,7 @@ describe('e2e: POST with content-length 0', () => {
 describe('e2e: 404 missing route', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/known', () => 'ok')
     server = await start(app)
   })
@@ -143,7 +143,7 @@ describe('e2e: 404 missing route', () => {
 describe('e2e: 405 wrong method', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/only-get', () => 'ok')
     app.post('/only-get', () => 'posted')
     server = await start(app)
@@ -164,7 +164,7 @@ describe('e2e: 405 wrong method', () => {
 describe('e2e: sub-router mounted at /api', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     const api = new Router()
     api.get('/users/:id', (ctx) => ({ scope: 'api', id: ctx.params.id }))
     app.use('/api', api)
@@ -186,7 +186,7 @@ describe('e2e: sub-router mounted at /api', () => {
 describe('e2e: middleware order A → handler → B', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.use(async (ctx, next) => {
       ctx.set('x-mw-a-before', '1')
       await next()
@@ -227,7 +227,7 @@ describe('e2e: middleware order A → handler → B', () => {
 describe('e2e: throw → onError handler', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', () => {
       throw new Error('boom')
     })
@@ -245,12 +245,12 @@ describe('e2e: throw → onError handler', () => {
   })
 })
 
-describe('e2e: throw RexValidationError → default boundary', () => {
+describe('e2e: throw RiftexValidationError → default boundary', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', () => {
-      throw new RexValidationError({ email: 'is required', age: 'must be > 0' })
+      throw new RiftexValidationError({ email: 'is required', age: 'must be > 0' })
     })
     server = await start(app)
   })
@@ -278,7 +278,7 @@ describe('e2e: large response body (1 MB)', () => {
   const PAYLOAD = 'x'.repeat(SIZE)
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', (ctx) => {
       ctx.text(PAYLOAD)
     })
@@ -300,7 +300,7 @@ describe('e2e: streamed response via ctx.stream()', () => {
   const CHUNKS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', (ctx) => {
       ctx.stream(Readable.from(CHUNKS), 'text/plain; charset=utf-8')
     })
@@ -323,7 +323,7 @@ describe('e2e: streamed response via ctx.stream()', () => {
 describe('e2e: concurrent requests', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/n/:n', async (ctx) => {
       // Tiny async hop to encourage interleaving.
       await new Promise((r) => setTimeout(r, 1))
@@ -353,7 +353,7 @@ describe('e2e: concurrent requests', () => {
 describe('e2e: header case-insensitivity', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', (ctx) => {
       // Node lowercases header names; verify a mixed-case sender still resolves
       // via the lowercase key.
@@ -376,7 +376,7 @@ describe('e2e: header case-insensitivity', () => {
 describe('e2e: multiple Set-Cookie headers', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     app.get('/', (ctx) => {
       ctx.set('set-cookie', ['a=1; Path=/', 'b=2; Path=/'])
       ctx.json({ ok: true })
@@ -401,7 +401,7 @@ describe('e2e: multiple Set-Cookie headers', () => {
 describe('e2e: keep-alive on a single connection', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex()
+    const app = riftex()
     let count = 0
     app.get('/', () => {
       count++

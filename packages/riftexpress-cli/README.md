@@ -1,6 +1,6 @@
 # riftexpress-cli
 
-`rex` — the project scaffolder for [RiftExpress](../riftexpress).
+`riftex` — the project scaffolder for [RiftExpress](../riftexpress).
 
 Zero runtime dependencies. No build step. Runs your TypeScript directly via Node 22+ native type stripping.
 
@@ -19,13 +19,13 @@ npx riftexpress-cli new my-api
 ## Usage
 
 ```text
-rex new <name> [--bun] [--minimal] [--force]
-rex routes
-rex --version
-rex --help
+riftex new <name> [--bun] [--minimal] [--force]
+riftex routes
+riftex --version
+riftex --help
 ```
 
-### `rex new <name>`
+### `riftex new <name>`
 
 Scaffolds a new RiftExpress project at `./<name>`.
 
@@ -39,10 +39,10 @@ Scaffolds a new RiftExpress project at `./<name>`.
 Examples:
 
 ```bash
-rex new my-api
-rex new my-api --minimal
-rex new my-api --bun
-rex new my-api --force
+riftex new my-api
+riftex new my-api --minimal
+riftex new my-api --bun
+riftex new my-api --force
 ```
 
 The generated project includes:
@@ -53,21 +53,21 @@ The generated project includes:
 - `.gitignore`
 - `README.md`
 
-### `rex routes`
+### `riftex routes`
 
 Placeholder. Will print the project's route table once the route introspection API lands.
 
-### `rex --version` / `-v`
+### `riftex --version` / `-v`
 
 Prints the CLI version.
 
-### `rex --help` / `-h`
+### `riftex --help` / `-h`
 
 Prints usage.
 
 ## How it works
 
-The published `bin/rex.mjs` shim spawns `node --experimental-strip-types src/cli.ts` so there is no compile step in this package. The trade-off is that you need Node 22+; older Node versions will fail at startup.
+The published `bin/riftex.mjs` shim spawns `node --experimental-strip-types src/cli.ts` so there is no compile step in this package. The trade-off is that you need Node 22+; older Node versions will fail at startup.
 
 ## Development
 

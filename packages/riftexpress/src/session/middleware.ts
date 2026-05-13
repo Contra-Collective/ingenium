@@ -1,13 +1,13 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { Buffer } from 'node:buffer'
-import type { RexMiddleware } from '../middleware/types.ts'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexMiddleware } from '../middleware/types.ts'
+import type { RiftexContext } from '../context/context.ts'
 import { MemoryStore } from './store-memory.ts'
 import type { Session, SessionCookieOptions, SessionOptions, SessionStore } from './types.ts'
 
 // ───── Constants ────────────────────────────────────────────────────────────
 
-const DEFAULT_COOKIE_NAME = 'rex.sid'
+const DEFAULT_COOKIE_NAME = 'riftex.sid'
 const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 7 // 7 days
 /** ID byte length — 18 bytes → 24 base64url chars, ~144 bits of entropy. */
 const ID_BYTES = 18
@@ -87,7 +87,7 @@ export function serializeCookie(
  * Append a `Set-Cookie` value to the response, preserving any existing
  * `Set-Cookie` header(s) from earlier middleware.
  */
-function appendSetCookie(ctx: RexContext, value: string): void {
+function appendSetCookie(ctx: RiftexContext, value: string): void {
   const existing = ctx.getHeader('set-cookie')
   if (!existing) {
     ctx.set('set-cookie', value)
@@ -221,17 +221,17 @@ class SessionImpl implements Session {
  * Cookie-backed session middleware.
  *
  * The middleware attaches a {@link Session} instance at `ctx.session`. To
- * make this typesafe in user code, augment the `RexContext` interface in
+ * make this typesafe in user code, augment the `RiftexContext` interface in
  * your own project:
  *
  * @example
  * ```ts
  * declare module 'riftexpress' {
- *   interface RexContext { session: import('riftexpress').Session }
+ *   interface RiftexContext { session: import('riftexpress').Session }
  * }
  *
- * import { rex, sessionMiddleware } from 'riftexpress'
- * const app = rex()
+ * import { riftex, sessionMiddleware } from 'riftexpress'
+ * const app = riftex()
  * app.use(sessionMiddleware({ secret: process.env.SESSION_SECRET! }))
  *
  * app.get('/me', (ctx) => ({ user: ctx.session.get('user') }))
@@ -250,7 +250,7 @@ class SessionImpl implements Session {
  * - Tampered or unknown cookies silently issue a fresh session — never an
  *   error response, since this is an attacker-influenced surface.
  */
-export function sessionMiddleware(opts: SessionOptions): RexMiddleware {
+export function sessionMiddleware(opts: SessionOptions): RiftexMiddleware {
   // ── Construction-time validation ─────────────────────────────────────────
   const secrets: readonly string[] = Array.isArray(opts.secret)
     ? opts.secret.slice()
@@ -320,7 +320,7 @@ export function sessionMiddleware(opts: SessionOptions): RexMiddleware {
  * Runs in `finally` so we still clean up after handler errors.
  */
 async function commit(
-  ctx: RexContext,
+  ctx: RiftexContext,
   session: SessionImpl,
   signingSecret: string,
   cookieName: string,

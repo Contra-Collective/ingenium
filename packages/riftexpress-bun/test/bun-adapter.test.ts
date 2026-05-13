@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { BunAdapter } from '../src/index.ts'
 
 // The adapter cannot run without the Bun runtime — skip the entire suite
@@ -8,7 +8,7 @@ const hasBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined'
 
 describe.skipIf(!hasBun)('BunAdapter', () => {
   async function bootApp() {
-    const app = rex({ transport: new BunAdapter() })
+    const app = riftex({ transport: new BunAdapter() })
 
     app.get('/hello', () => ({ hello: 'world' }))
 

@@ -1,18 +1,18 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /** A function the framework hands to the transport — call it per request. */
-export type TransportDispatch = (ctx: RexContext) => Promise<void>
+export type TransportDispatch = (ctx: RiftexContext) => Promise<void>
 
 /** A function the transport calls to acquire a context from the pool. */
-export type TransportAcquire = () => RexContext
+export type TransportAcquire = () => RiftexContext
 
 /** A function the transport calls to release a context back to the pool. */
-export type TransportRelease = (ctx: RexContext) => void
+export type TransportRelease = (ctx: RiftexContext) => void
 
 /**
  * The hooks a transport uses to interact with the framework. The transport
  * owns the request/response objects from its underlying server (node:http,
- * Bun.serve, etc.), populates a `RexContext` from each request, awaits the
+ * Bun.serve, etc.), populates a `RiftexContext` from each request, awaits the
  * `dispatch` callback, then writes the context's response state to the wire.
  */
 export interface TransportHooks {

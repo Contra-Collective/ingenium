@@ -1,4 +1,4 @@
-import type { RexMiddleware } from '../middleware/types.ts'
+import type { RiftexMiddleware } from '../middleware/types.ts'
 
 /**
  * Express compatibility shim. In RiftExpress, body parsing is lazy via
@@ -13,7 +13,7 @@ import type { RexMiddleware } from '../middleware/types.ts'
  *
  * @returns a no-op middleware
  */
-export function jsonMiddleware(_opts?: { limit?: number }): RexMiddleware {
+export function jsonMiddleware(_opts?: { limit?: number }): RiftexMiddleware {
   return async (_ctx, next) => {
     await next()
   }
@@ -23,7 +23,7 @@ export function jsonMiddleware(_opts?: { limit?: number }): RexMiddleware {
  * See `jsonMiddleware` — same rationale. URL-encoded parsing is lazy via
  * `ctx.body.urlencoded()`.
  */
-export function urlencodedMiddleware(_opts?: { limit?: number }): RexMiddleware {
+export function urlencodedMiddleware(_opts?: { limit?: number }): RiftexMiddleware {
   return async (_ctx, next) => {
     await next()
   }

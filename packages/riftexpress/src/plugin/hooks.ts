@@ -1,4 +1,4 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type {
   Hooks,
   OnComposeHook,
@@ -89,20 +89,20 @@ export class HooksRegistry implements Hooks {
     }
   }
 
-  async runOnRequest(ctx: RexContext): Promise<void> {
+  async runOnRequest(ctx: RiftexContext): Promise<void> {
     for (let i = 0; i < this._onRequest.length; i++) {
       await this._onRequest[i]!(ctx)
     }
   }
 
-  async runOnResponse(ctx: RexContext): Promise<void> {
+  async runOnResponse(ctx: RiftexContext): Promise<void> {
     for (let i = 0; i < this._onResponse.length; i++) {
       await this._onResponse[i]!(ctx)
     }
   }
 
   /** Observation only. Throws inside listeners are swallowed. */
-  async runOnError(err: unknown, ctx: RexContext): Promise<void> {
+  async runOnError(err: unknown, ctx: RiftexContext): Promise<void> {
     for (let i = 0; i < this._onError.length; i++) {
       try {
         await this._onError[i]!(err, ctx)

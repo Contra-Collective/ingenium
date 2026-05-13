@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { request as httpRequest, type IncomingMessage } from 'node:http'
 import { NodeAdapter } from '../src/transport/node.ts'
 import { gracefulShutdown } from '../src/transport/shutdown.ts'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import type { ListeningServer, TransportHooks } from '../src/transport/types.ts'
 
 /**
@@ -10,11 +10,11 @@ import type { ListeningServer, TransportHooks } from '../src/transport/types.ts'
  * behavior. Returns the listening handle so the test can drive it.
  */
 async function startServer(
-  dispatch: (ctx: RexContext) => Promise<void>,
+  dispatch: (ctx: RiftexContext) => Promise<void>,
 ): Promise<ListeningServer> {
   const adapter = new NodeAdapter()
   const hooks: TransportHooks = {
-    acquire: () => new RexContext(),
+    acquire: () => new RiftexContext(),
     release: () => {
       /* no-op for tests */
     },

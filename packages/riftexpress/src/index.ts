@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import { makeRexFactory, type RexFactory } from './app.ts'
+import { makeRexFactory, type RiftexFactory } from './app.ts'
 import { jsonMiddleware, urlencodedMiddleware } from './body/middleware.ts'
 import { staticMiddleware } from './static/middleware.ts'
 import { corsMiddleware } from './cors/middleware.ts'
@@ -12,13 +12,13 @@ import { sse } from './sse/sse.ts'
 import { rateLimit } from './rate-limit/middleware.ts'
 
 // ───── App + Router ────────────────────────────────────────────────────────
-export { RexApp, type RexAppOptions, type RexErrorHandler } from './app.ts'
+export { RiftexApp, type RiftexAppOptions, type RiftexErrorHandler } from './app.ts'
 export { Router } from './router/router.ts'
 
 // ───── Context + Body ──────────────────────────────────────────────────────
-export { RexContext, type ResponseBody } from './context/context.ts'
-export { RexBody, type ParseSchema, type SafeParseSchema } from './context/body.ts'
-export { RexContextPool } from './context/pool.ts'
+export { RiftexContext, type ResponseBody } from './context/context.ts'
+export { RiftexBody, type ParseSchema, type SafeParseSchema } from './context/body.ts'
+export { RiftexContextPool } from './context/pool.ts'
 export type {
   MultipartFile,
   MultipartOptions,
@@ -38,7 +38,7 @@ export {
 } from './schema/standard.ts'
 
 // ───── Middleware + Handler types ──────────────────────────────────────────
-export type { RexMiddleware, RexHandler, ComposedHandler } from './middleware/types.ts'
+export type { RiftexMiddleware, RiftexHandler, ComposedHandler } from './middleware/types.ts'
 export { compose, composeWithHandler } from './middleware/compose.ts'
 
 // ───── Router types ────────────────────────────────────────────────────────
@@ -56,13 +56,13 @@ export type { CorsOptions, CorsOrigin, CorsOriginFn } from './cors/types.ts'
 
 // ───── Errors ──────────────────────────────────────────────────────────────
 export {
-  RexError,
-  RexNotFoundError,
-  RexUnauthorizedError,
-  RexMethodNotAllowedError,
-  RexPayloadTooLargeError,
-  RexValidationError,
-  RexBadRequestError,
+  RiftexError,
+  RiftexNotFoundError,
+  RiftexUnauthorizedError,
+  RiftexMethodNotAllowedError,
+  RiftexPayloadTooLargeError,
+  RiftexValidationError,
+  RiftexBadRequestError,
 } from './errors.ts'
 
 // ───── Transport (mainly for advanced users / tests) ───────────────────────
@@ -109,7 +109,7 @@ export {
 
 // ───── Plugin system ───────────────────────────────────────────────────────
 export type {
-  RexPlugin,
+  RiftexPlugin,
   Hooks,
   RegistrationEvent,
   Decorator,
@@ -130,25 +130,25 @@ export { DecoratorRegistry } from './plugin/decorators.ts'
  * Create a new RiftExpress application.
  *
  * @example
- * import { rex } from 'riftexpress'
+ * import { riftex } from 'riftexpress'
  *
- * const app = rex()
+ * const app = riftex()
  * app.get('/', (ctx) => ({ hello: 'world' }))
  * await app.listen(3000)
  */
-const rexCore: RexFactory = makeRexFactory()
+const rexCore: RiftexFactory = makeRexFactory()
 
 /**
- * The `rex` export is callable AND has static helpers attached:
+ * The `riftex` export is callable AND has static helpers attached:
  *
- * - `rex(opts?)` — create an app
- * - `rex.Router()` — create a mountable router
- * - `rex.json(opts?)` — Express-compat body-parser shim (no-op; parsing is lazy)
- * - `rex.urlencoded(opts?)` — same, for `application/x-www-form-urlencoded`
- * - `rex.static(root, opts?)` — serve files from a directory
- * - `rex.cors(opts?)` — CORS middleware (simple + preflight)
+ * - `riftex(opts?)` — create an app
+ * - `riftex.Router()` — create a mountable router
+ * - `riftex.json(opts?)` — Express-compat body-parser shim (no-op; parsing is lazy)
+ * - `riftex.urlencoded(opts?)` — same, for `application/x-www-form-urlencoded`
+ * - `riftex.static(root, opts?)` — serve files from a directory
+ * - `riftex.cors(opts?)` — CORS middleware (simple + preflight)
  */
-export const rex = Object.assign(rexCore, {
+export const riftex = Object.assign(rexCore, {
   json: jsonMiddleware,
   urlencoded: urlencodedMiddleware,
   static: staticMiddleware,
@@ -157,4 +157,4 @@ export const rex = Object.assign(rexCore, {
   rateLimit,
 })
 
-export default rex
+export default riftex

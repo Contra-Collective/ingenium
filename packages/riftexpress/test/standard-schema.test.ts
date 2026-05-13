@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RexBody } from '../src/context/body.ts'
-import { RexValidationError } from '../src/errors.ts'
+import { RiftexBody } from '../src/context/body.ts'
+import { RiftexValidationError } from '../src/errors.ts'
 import {
   isStandardSchema,
   type StandardResult,
   type StandardSchemaV1,
 } from '../src/schema/standard.ts'
 
-const attach = (body: RexBody, src: Readable | null) => body._attach(src, undefined, undefined)
+const attach = (body: RiftexBody, src: Readable | null) => body._attach(src, undefined, undefined)
 const stream = (s: string) => Readable.from([Buffer.from(s)])
 
-describe('Standard Schema support in RexBody.json()', () => {
+describe('Standard Schema support in RiftexBody.json()', () => {
   it('returns the validated value on a successful sync schema', async () => {
     const schema: StandardSchemaV1<unknown, { name: string }> = {
       '~standard': {
@@ -27,13 +27,13 @@ describe('Standard Schema support in RexBody.json()', () => {
         },
       },
     }
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, stream('{"name":"alice"}'))
     const out = await body.json(schema)
     expect(out).toEqual({ name: 'alice' })
   })
 
-  it('throws RexValidationError with multi-path fields on multiple issues', async () => {
+  it('throws RiftexValidationError with multi-path fields on multiple issues', async () => {
     const schema: StandardSchemaV1<unknown, { user: { email: string }; age: number }> = {
       '~standard': {
         version: 1,
@@ -50,14 +50,14 @@ describe('Standard Schema support in RexBody.json()', () => {
         },
       },
     }
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, stream('{}'))
     try {
       await body.json(schema)
       throw new Error('should have thrown')
     } catch (err) {
-      expect(err).toBeInstanceOf(RexValidationError)
-      const fields = (err as RexValidationError).fields
+      expect(err).toBeInstanceOf(RiftexValidationError)
+      const fields = (err as RiftexValidationError).fields
       expect(fields).toEqual({
         'user.email': 'invalid email',
         age: 'must be > 0',
@@ -75,7 +75,7 @@ describe('Standard Schema support in RexBody.json()', () => {
         }),
       },
     }
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, stream('{}'))
     await expect(body.json(schema)).rejects.toMatchObject({
       fields: { _: 'root failure' },
@@ -95,11 +95,11 @@ describe('Standard Schema support in RexBody.json()', () => {
         },
       },
     }
-    const ok = new RexBody()
+    const ok = new RiftexBody()
     attach(ok, stream('{"ok":true}'))
     expect(await ok.json(schema)).toEqual({ ok: true })
 
-    const bad = new RexBody()
+    const bad = new RiftexBody()
     attach(bad, stream('{"ok":false}'))
     await expect(bad.json(schema)).rejects.toMatchObject({
       fields: { ok: 'not ok' },
@@ -124,7 +124,7 @@ describe('Standard Schema support in RexBody.json()', () => {
         return { success: true as const, data: { via: 'safeParse' as const } }
       },
     }
-    const body = new RexBody()
+    const body = new RiftexBody()
     attach(body, stream('{}'))
     const out = await body.json(schema as unknown as StandardSchemaV1<unknown, { via: 'standard' }>)
     expect(out).toEqual({ via: 'standard' })

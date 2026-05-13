@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { Buffer } from 'node:buffer'
-import { rex } from '../src/index.ts'
+import { riftex } from '../src/index.ts'
 import type { ListeningServer } from '../src/transport/types.ts'
 
 const FIXTURES = {
@@ -16,13 +16,13 @@ let ROOT: string
 let server: ListeningServer
 
 beforeAll(async () => {
-  ROOT = mkdtempSync(path.join(os.tmpdir(), 'rex-e2e-'))
+  ROOT = mkdtempSync(path.join(os.tmpdir(), 'riftex-e2e-'))
   for (const [name, content] of Object.entries(FIXTURES)) {
     writeFileSync(path.join(ROOT, name), content as string | Buffer)
   }
 
-  const app = rex()
-  app.use(rex.static(ROOT))
+  const app = riftex()
+  app.use(riftex.static(ROOT))
   // Downstream handler reached only when static calls next().
   app.get('/__downstream__', () => ({ downstream: true }))
   // Wildcard fallback so we can prove static defers to next() for misses.

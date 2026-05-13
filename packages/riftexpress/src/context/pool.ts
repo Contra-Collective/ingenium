@@ -1,13 +1,13 @@
-import { RexContext } from './context.ts'
+import { RiftexContext } from './context.ts'
 
 /**
- * A bounded free-list of `RexContext` objects. Acquire on each request,
+ * A bounded free-list of `RiftexContext` objects. Acquire on each request,
  * release back when the response has been written. If the pool is empty,
  * a fresh context is allocated; if the pool is full on release, the
  * context is discarded (GC handles it). Never blocks.
  */
-export class RexContextPool {
-  private readonly pool: RexContext[] = []
+export class RiftexContextPool {
+  private readonly pool: RiftexContext[] = []
   private readonly max: number
 
   constructor(maxSize = 1024) {
@@ -15,12 +15,12 @@ export class RexContextPool {
   }
 
   /** Acquire a context. Caller must call `release()` when done. */
-  acquire(): RexContext {
-    return this.pool.pop() ?? new RexContext()
+  acquire(): RiftexContext {
+    return this.pool.pop() ?? new RiftexContext()
   }
 
   /** Reset and return the context to the free list (or discard if full). */
-  release(ctx: RexContext): void {
+  release(ctx: RiftexContext): void {
     ctx.reset()
     if (this.pool.length < this.max) this.pool.push(ctx)
   }

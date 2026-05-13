@@ -1,5 +1,5 @@
-import type { RexApp } from '../app.ts'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexApp } from '../app.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
 
 /**
@@ -19,14 +19,14 @@ export interface RegistrationEvent {
  * `compose()` runs; they may be async.
  *
  * @example
- * const myPlugin: RexPlugin<{ secret: string }> = async (app, opts) => {
+ * const myPlugin: RiftexPlugin<{ secret: string }> = async (app, opts) => {
  *   app.hooks.onRequest((ctx) => { ... })
  *   app.decorate('user', (ctx) => loadUser(ctx, opts.secret))
  * }
  *
  * await app.register(myPlugin, { secret: 'shh' })
  */
-export type RexPlugin<O = void> = (app: RexApp, opts: O) => void | Promise<void>
+export type RiftexPlugin<O = void> = (app: RiftexApp, opts: O) => void | Promise<void>
 
 /** Fires once per route as the trie is built (during `compose()`). */
 export type OnRouteHook = (registration: RegistrationEvent) => void
@@ -35,17 +35,17 @@ export type OnRouteHook = (registration: RegistrationEvent) => void
 export type OnComposeHook = () => void | Promise<void>
 
 /** Fires at the start of every request, before middleware dispatch. */
-export type OnRequestHook = (ctx: RexContext) => void | Promise<void>
+export type OnRequestHook = (ctx: RiftexContext) => void | Promise<void>
 
 /** Fires after the handler resolves successfully. */
-export type OnResponseHook = (ctx: RexContext) => void | Promise<void>
+export type OnResponseHook = (ctx: RiftexContext) => void | Promise<void>
 
 /**
  * Fires when the handler chain throws. OBSERVATION ONLY — the framework's
  * error boundary still owns the response. Throwing inside an `onError` hook
  * is swallowed; this is by design so observers can't mask the original error.
  */
-export type OnErrorHook = (err: unknown, ctx: RexContext) => void | Promise<void>
+export type OnErrorHook = (err: unknown, ctx: RiftexContext) => void | Promise<void>
 
 /**
  * Public hooks API exposed on `app.hooks`. Each method appends a listener;
@@ -61,10 +61,10 @@ export interface Hooks {
 }
 
 /** Lazy decorator — computed on first access, then cached on the ctx. */
-export type LazyDecorator<T = unknown> = (ctx: RexContext) => T
+export type LazyDecorator<T = unknown> = (ctx: RiftexContext) => T
 
 /** Eager decorator — evaluated at request start, value assigned directly. */
-export type EagerDecorator<T = unknown> = (ctx: RexContext) => T
+export type EagerDecorator<T = unknown> = (ctx: RiftexContext) => T
 
 /** Generic decorator factory shape (covers both lazy and eager). */
-export type Decorator<T = unknown> = (ctx: RexContext) => T
+export type Decorator<T = unknown> = (ctx: RiftexContext) => T

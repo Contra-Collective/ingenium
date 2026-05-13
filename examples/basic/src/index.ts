@@ -2,9 +2,9 @@
 // If you've used Express, this should look very familiar — same shape,
 // just a `ctx` object instead of `(req, res)` and async-aware return values.
 
-import { rex, gracefulShutdown, type RexMiddleware } from 'riftexpress'
+import { riftex, gracefulShutdown, type RiftexMiddleware } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 
 // Decorator: lazily attach an app start time to every ctx (read once, cached).
 // Express equivalent: stash on `app.locals` and read manually in handlers.
@@ -12,7 +12,7 @@ app.decorateRequest('startedAt', () => Date.now())
 
 // Middleware: same `(ctx, next)` pattern Koa users will recognize.
 // Express equivalent: app.use((req, res, next) => { ...; next() })
-const logger: RexMiddleware = async (ctx, next) => {
+const logger: RiftexMiddleware = async (ctx, next) => {
   await next()
   console.log(`${ctx.method} ${ctx.path} -> ${Date.now() - (ctx as any).startedAt}ms`)
 }
@@ -20,7 +20,7 @@ app.use(logger)
 
 // Static-file middleware. Drop assets in ./public and they'll be served at /.
 // Express equivalent: app.use(express.static('./public'))
-app.use(rex.static('./public'))
+app.use(riftex.static('./public'))
 
 // Health check — return value is reflected to the wire as JSON.
 app.use('/health', () => ({ ok: true }))

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContext } from '../src/context/context.ts'
 import { resolveForwarded } from '../src/proxy/trust.ts'
 
-function ctx(headers: Record<string, string | string[]>, remote = '10.0.0.5'): RexContext {
-  const c = new RexContext()
+function ctx(headers: Record<string, string | string[]>, remote = '10.0.0.5'): RiftexContext {
+  const c = new RiftexContext()
   c.headers = headers
   c.remoteAddress = remote
   return c
@@ -73,7 +73,7 @@ describe('resolveForwarded (low-level)', () => {
   })
 })
 
-describe('RexContext getters (high-level)', () => {
+describe('RiftexContext getters (high-level)', () => {
   it('ip falls back to remoteAddress when trust=false', () => {
     const c = ctx({ 'x-forwarded-for': '1.2.3.4' })
     expect(c.ip).toBe('10.0.0.5')

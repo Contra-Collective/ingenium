@@ -1,5 +1,5 @@
 /**
- * Options for the `rex.static` middleware.
+ * Options for the `riftex.static` middleware.
  */
 export interface StaticOptions {
   /**

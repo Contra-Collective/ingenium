@@ -22,7 +22,7 @@
  *
  *  cookie-parser       — SUPPORTED
  *      Reads `req.headers.cookie`, sets `req.cookies`. Our shim mirrors
- *      `req.cookies` back into `ctx.state.cookies` so downstream Rex
+ *      `req.cookies` back into `ctx.state.cookies` so downstream Riftex
  *      middleware can read them.
  *
  *  express-rate-limit  — PARTIAL (tested with low limit, asserted 429)
@@ -38,7 +38,7 @@
  *      not implement Transform-stream-style writeable behavior. The
  *      middleware silently no-ops: response is delivered uncompressed,
  *      with no Content-Encoding header. Test below is skipped with a
- *      written explanation; users should rely on a future Rex-native
+ *      written explanation; users should rely on a future Riftex-native
  *      gzip middleware (or set Content-Encoding manually for static
  *      assets).
  *
@@ -62,7 +62,7 @@
  *      express-session monkey-patches `res.end` to persist the session
  *      and write a Set-Cookie header at response time. Our `end` shim is
  *      a one-shot terminator that runs synchronously inside the wrapper;
- *      session's wrapped end is never reached during a real RexContext
+ *      session's wrapped end is never reached during a real RiftexContext
  *      response (RiftExpress writes the response itself after dispatch).
  *      The Set-Cookie header is therefore never written. Skipped.
  *
@@ -94,19 +94,19 @@ import passport from 'passport'
 import session from 'express-session'
 import multer from 'multer'
 
-import { RexApp, NodeAdapter, type ListeningServer, type RexContext } from 'riftexpress'
+import { RiftexApp, NodeAdapter, type ListeningServer, type RiftexContext } from 'riftexpress'
 import { expressCompat, type ExpressMiddleware } from '../src/index.ts'
 
 // ───── Tiny harness ────────────────────────────────────────────────────────
 
 interface BootedApp {
-  app: RexApp
+  app: RiftexApp
   server: ListeningServer
   url: string
 }
 
-async function boot(configure: (app: RexApp) => void): Promise<BootedApp> {
-  const app = new RexApp({ transport: new NodeAdapter() })
+async function boot(configure: (app: RiftexApp) => void): Promise<BootedApp> {
+  const app = new RiftexApp({ transport: new NodeAdapter() })
   configure(app)
   const server = await app.listen(0)
   return { app, server, url: `http://${server.host === '0.0.0.0' ? '127.0.0.1' : server.host}:${server.port}` }
@@ -124,7 +124,7 @@ describe('cors (SUPPORTED)', () => {
   beforeAll(async () => {
     booted = await boot((app) => {
       app.use(expressCompat(cors() as ExpressMiddleware))
-      app.get('/ping', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.get('/ping', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
   })
   afterAll(() => shutdown(booted))
@@ -160,7 +160,7 @@ describe('helmet (SUPPORTED)', () => {
   beforeAll(async () => {
     booted = await boot((app) => {
       app.use(expressCompat(helmet() as ExpressMiddleware))
-      app.get('/ping', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.get('/ping', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
   })
   afterAll(() => shutdown(booted))
@@ -203,7 +203,7 @@ describe('morgan (PARTIAL)', () => {
       app.use(
         expressCompat(morgan(fmt, { stream, immediate: true }) as unknown as ExpressMiddleware),
       )
-      app.get('/log-me', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.get('/log-me', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
   })
   afterAll(() => shutdown(booted))
@@ -246,13 +246,13 @@ describe('compression (UNSUPPORTED)', () => {
    *   the raw JSON.
    *
    * Recommendation:
-   *   Use a Rex-native gzip middleware (TODO upstream). For static assets,
+   *   Use a Riftex-native gzip middleware (TODO upstream). For static assets,
    *   precompress + set Content-Encoding manually.
    */
   it.skip('would gzip /big when Accept-Encoding: gzip', async () => {
     const booted = await boot((app) => {
       app.use(expressCompat(compression() as unknown as ExpressMiddleware))
-      app.get('/big', (ctx: RexContext) => ctx.json({ data: 'x'.repeat(2048) }))
+      app.get('/big', (ctx: RiftexContext) => ctx.json({ data: 'x'.repeat(2048) }))
     })
     try {
       const res = await fetch(`${booted.url}/big`, { headers: { 'accept-encoding': 'gzip' } })
@@ -273,8 +273,8 @@ describe('cookie-parser (SUPPORTED)', () => {
   beforeAll(async () => {
     booted = await boot((app) => {
       app.use(expressCompat(cookieParser() as unknown as ExpressMiddleware))
-      // Downstream Rex middleware reads via ctx.state.cookies (mirrored from req.cookies).
-      app.get('/cookies', (ctx: RexContext) => {
+      // Downstream Riftex middleware reads via ctx.state.cookies (mirrored from req.cookies).
+      app.get('/cookies', (ctx: RiftexContext) => {
         const cookies = ctx.state['cookies'] as Record<string, string> | undefined
         ctx.json({ session: cookies?.session ?? null, theme: cookies?.theme ?? null })
       })
@@ -315,7 +315,7 @@ describe('express-rate-limit (PARTIAL — works with custom keyGenerator)', () =
     })
     booted = await boot((app) => {
       app.use(expressCompat(limiter as unknown as ExpressMiddleware))
-      app.get('/limited', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.get('/limited', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
   })
   afterAll(() => shutdown(booted))
@@ -356,12 +356,12 @@ describe('body-parser (UNSUPPORTED)', () => {
    * Recommendation:
    *   USE `await ctx.body.json()` — RiftExpress already parses request
    *   bodies natively, with the same 100kb default limit. body-parser
-   *   is redundant in a Rex app.
+   *   is redundant in a Riftex app.
    */
   it.skip('would populate req.body with parsed JSON', async () => {
     const booted = await boot((app) => {
       app.use(expressCompat(bodyParser.json() as unknown as ExpressMiddleware))
-      app.post('/echo', (ctx: RexContext) => ctx.json({ got: ctx.state['body'] }))
+      app.post('/echo', (ctx: RiftexContext) => ctx.json({ got: ctx.state['body'] }))
     })
     try {
       const res = await fetch(`${booted.url}/echo`, {
@@ -384,7 +384,7 @@ describe('passport (UNSUPPORTED for auth flows; initialize() is a no-op)', () =>
   beforeAll(async () => {
     booted = await boot((app) => {
       app.use(expressCompat(passport.initialize() as unknown as ExpressMiddleware))
-      app.get('/who', (ctx: RexContext) =>
+      app.get('/who', (ctx: RiftexContext) =>
         ctx.json({ hasPassport: ctx.state['_passport'] !== undefined }),
       )
     })
@@ -415,7 +415,7 @@ describe('passport (UNSUPPORTED for auth flows; initialize() is a no-op)', () =>
    *   wrapper resolved.
    *
    * Recommendation:
-   *   Implement auth natively with RexContext (`ctx.redirect`,
+   *   Implement auth natively with RiftexContext (`ctx.redirect`,
    *   `ctx.state.user`, RiftExpress sessionMiddleware).
    */
   it.skip('passport.authenticate("local") flow would fail at res.redirect', async () => {
@@ -458,7 +458,7 @@ describe('express-session (UNSUPPORTED)', () => {
           session({ secret: 'test', resave: false, saveUninitialized: true }) as unknown as ExpressMiddleware,
         ),
       )
-      app.get('/s', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.get('/s', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
     try {
       const res = await fetch(`${booted.url}/s`)
@@ -496,7 +496,7 @@ describe('multer (UNSUPPORTED)', () => {
     const booted = await boot((app) => {
       const upload = multer({ storage: multer.memoryStorage() })
       app.use(expressCompat(upload.single('file') as unknown as ExpressMiddleware))
-      app.post('/upload', (ctx: RexContext) => ctx.json({ ok: true }))
+      app.post('/upload', (ctx: RiftexContext) => ctx.json({ ok: true }))
     })
     try {
       const fd = new FormData()

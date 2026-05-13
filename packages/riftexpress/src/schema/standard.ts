@@ -3,8 +3,8 @@
  * [Standard Schema](https://standardschema.dev) v1 spec.
  *
  * RiftExpress detects schemas implementing this contract on
- * `RexBody.json(schema)` and runs their `validate` function, mapping
- * `issues` into a `RexValidationError` with field-level messages.
+ * `RiftexBody.json(schema)` and runs their `validate` function, mapping
+ * `issues` into a `RiftexValidationError` with field-level messages.
  *
  * We intentionally do NOT import `@standard-schema/spec` to keep the
  * core dependency-free. These types mirror the spec exactly.

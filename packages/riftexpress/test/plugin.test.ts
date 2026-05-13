@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { rex } from '../src/index.ts'
-import { RexApp } from '../src/app.ts'
-import { RexContext } from '../src/context/context.ts'
-import { RexUnauthorizedError } from '../src/errors.ts'
-import type { RexPlugin } from '../src/plugin/types.ts'
+import { riftex } from '../src/index.ts'
+import { RiftexApp } from '../src/app.ts'
+import { RiftexContext } from '../src/context/context.ts'
+import { RiftexUnauthorizedError } from '../src/errors.ts'
+import type { RiftexPlugin } from '../src/plugin/types.ts'
 
 /** Helper: build a context primed for `app.handle()`. */
-function makeCtx(method = 'GET', path = '/'): RexContext {
-  const ctx = new RexContext()
-  ctx.method = method as RexContext['method']
+function makeCtx(method = 'GET', path = '/'): RiftexContext {
+  const ctx = new RiftexContext()
+  ctx.method = method as RiftexContext['method']
   ctx.path = path
   ctx.url = path
   return ctx
@@ -16,8 +16,8 @@ function makeCtx(method = 'GET', path = '/'): RexContext {
 
 describe('plugin system — register', () => {
   it('plugin can register a route which is then reachable', async () => {
-    const app = rex()
-    const plugin: RexPlugin = (a) => {
+    const app = riftex()
+    const plugin: RiftexPlugin = (a) => {
       a.get('/from-plugin', (ctx) => ctx.json({ ok: true }))
     }
     await app.register(plugin)
@@ -32,9 +32,9 @@ describe('plugin system — register', () => {
   })
 
   it('plugin with options receives them verbatim', async () => {
-    const app = rex()
+    const app = riftex()
     const seen: { value?: string } = {}
-    const plugin: RexPlugin<{ value: string }> = (a, opts) => {
+    const plugin: RiftexPlugin<{ value: string }> = (a, opts) => {
       seen.value = opts.value
       a.get('/v', (ctx) => ctx.json({ v: opts.value }))
     }
@@ -50,17 +50,17 @@ describe('plugin system — register', () => {
   })
 
   it('register() returns the app for chaining and is awaitable', async () => {
-    const app = rex()
-    const noop: RexPlugin = () => {}
+    const app = riftex()
+    const noop: RiftexPlugin = () => {}
     const result = await app.register(noop)
-    expect(result).toBeInstanceOf(RexApp)
+    expect(result).toBeInstanceOf(RiftexApp)
     expect(result).toBe(app)
   })
 
   it('async plugin is awaited before register resolves', async () => {
-    const app = rex()
+    const app = riftex()
     let installed = false
-    const plugin: RexPlugin = async (a) => {
+    const plugin: RiftexPlugin = async (a) => {
       await new Promise<void>((r) => setTimeout(r, 5))
       a.get('/late', (ctx) => ctx.text('ok'))
       installed = true
@@ -76,7 +76,7 @@ describe('plugin system — register', () => {
 
 describe('plugin system — hooks', () => {
   it('onRequest fires before the handler', async () => {
-    const app = rex()
+    const app = riftex()
     const order: string[] = []
     app.hooks.onRequest((ctx) => {
       order.push(`onRequest:${ctx.path}`)
@@ -91,7 +91,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('onResponse fires after the handler resolves', async () => {
-    const app = rex()
+    const app = riftex()
     const order: string[] = []
     app.hooks.onResponse(() => {
       order.push('onResponse')
@@ -107,7 +107,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('onError fires when handler throws AND error boundary still writes 5xx', async () => {
-    const app = rex()
+    const app = riftex()
     const seen: unknown[] = []
     app.hooks.onError((err) => {
       seen.push(err)
@@ -130,7 +130,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('onError throwing does NOT mask the original error', async () => {
-    const app = rex()
+    const app = riftex()
     app.hooks.onError(() => {
       throw new Error('observer failure')
     })
@@ -148,7 +148,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('onCompose fires once before composition', async () => {
-    const app = rex()
+    const app = riftex()
     const calls: string[] = []
     app.hooks.onCompose(() => {
       calls.push('compose')
@@ -161,7 +161,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('onRoute fires for each registered route during composition', async () => {
-    const app = rex()
+    const app = riftex()
     const seen: string[] = []
     app.hooks.onRoute((reg) => {
       seen.push(`${reg.method} ${reg.path}`)
@@ -174,7 +174,7 @@ describe('plugin system — hooks', () => {
   })
 
   it('hooks run sequentially in registration order', async () => {
-    const app = rex()
+    const app = riftex()
     const order: string[] = []
     app.hooks.onRequest(async () => {
       await Promise.resolve()
@@ -193,8 +193,8 @@ describe('plugin system — hooks', () => {
 
 describe('plugin system — decorators', () => {
   it('decorate(): factory runs once on first access; cached thereafter', async () => {
-    const app = rex()
-    const factory = vi.fn((_ctx: RexContext) => ({ id: 7 }))
+    const app = riftex()
+    const factory = vi.fn((_ctx: RiftexContext) => ({ id: 7 }))
     app.decorate('user', factory)
 
     let captured: unknown
@@ -212,7 +212,7 @@ describe('plugin system — decorators', () => {
   })
 
   it('decorate(): factory not called if property never read', async () => {
-    const app = rex()
+    const app = riftex()
     const factory = vi.fn(() => 'never')
     app.decorate('ghost', factory)
     app.get('/x', (ctx) => ctx.text('ok'))
@@ -222,7 +222,7 @@ describe('plugin system — decorators', () => {
   })
 
   it('decorateRequest(): value is set eagerly at request start', async () => {
-    const app = rex()
+    const app = riftex()
     let observed: number | undefined
     app.decorateRequest('startedAt', () => 42)
     app.get('/t', (ctx) => {
@@ -235,7 +235,7 @@ describe('plugin system — decorators', () => {
   })
 
   it('decorators are reapplied per request (no leakage between requests)', async () => {
-    const app = rex()
+    const app = riftex()
     let counter = 0
     app.decorateRequest('n', () => ++counter)
     app.get('/n', (ctx) => {
@@ -262,7 +262,7 @@ describe('plugin system — end-to-end auth plugin', () => {
    * Authorization header, decorates ctx with a lazy `user`, and exposes a
    * `requireAuth()` decorator method that handlers can call.
    */
-  const authPlugin: RexPlugin<{ token: string; user: User }> = (app, opts) => {
+  const authPlugin: RiftexPlugin<{ token: string; user: User }> = (app, opts) => {
     app.hooks.onRequest((ctx) => {
       const header = ctx.headers.authorization
       if (header === `Bearer ${opts.token}`) {
@@ -279,13 +279,13 @@ describe('plugin system — end-to-end auth plugin', () => {
 
     app.decorate('requireAuth', (ctx) => () => {
       if (ctx.state.authValid !== true) {
-        throw new RexUnauthorizedError()
+        throw new RiftexUnauthorizedError()
       }
     })
   }
 
   it('end-to-end: protected route succeeds with valid token', async () => {
-    const app = rex()
+    const app = riftex()
     await app.register(authPlugin, {
       token: 'secret',
       user: { id: 'u1', name: 'Ada' },
@@ -309,7 +309,7 @@ describe('plugin system — end-to-end auth plugin', () => {
   })
 
   it('end-to-end: protected route 401s without token (via error boundary)', async () => {
-    const app = rex()
+    const app = riftex()
     await app.register(authPlugin, {
       token: 'secret',
       user: { id: 'u1', name: 'Ada' },

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { rex } from '../src/index.ts'
+import { riftex } from '../src/index.ts'
 import type { ListeningServer } from '../src/transport/types.ts'
 
 function url(server: ListeningServer, path: string): string {
@@ -9,7 +9,7 @@ function url(server: ListeningServer, path: string): string {
 describe('e2e trustProxy: "loopback" honors X-Forwarded-For', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex({ trustProxy: 'loopback' })
+    const app = riftex({ trustProxy: 'loopback' })
     app.get('/whoami', (ctx) => ({ ip: ctx.ip, ips: ctx.ips, remote: ctx.remoteAddress }))
     server = await app.listen(0, '127.0.0.1')
   })
@@ -46,7 +46,7 @@ describe('e2e trustProxy: "loopback" honors X-Forwarded-For', () => {
 describe('e2e trustProxy: false (default) ignores X-Forwarded-For', () => {
   let server: ListeningServer
   beforeAll(async () => {
-    const app = rex() // trustProxy defaults to false
+    const app = riftex() // trustProxy defaults to false
     app.get('/whoami', (ctx) => ({ ip: ctx.ip, remote: ctx.remoteAddress }))
     server = await app.listen(0, '127.0.0.1')
   })

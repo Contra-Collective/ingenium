@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { RexContextPool } from '../src/context/pool.ts'
-import { RexContext } from '../src/context/context.ts'
+import { RiftexContextPool } from '../src/context/pool.ts'
+import { RiftexContext } from '../src/context/context.ts'
 
-describe('RexContextPool', () => {
-  it('acquire returns a fresh RexContext when empty', () => {
-    const pool = new RexContextPool(8)
+describe('RiftexContextPool', () => {
+  it('acquire returns a fresh RiftexContext when empty', () => {
+    const pool = new RiftexContextPool(8)
     const ctx = pool.acquire()
-    expect(ctx).toBeInstanceOf(RexContext)
+    expect(ctx).toBeInstanceOf(RiftexContext)
     expect(pool.size).toBe(0)
   })
 
   it('release returns the context to the free list', () => {
-    const pool = new RexContextPool(8)
+    const pool = new RiftexContextPool(8)
     const ctx = pool.acquire()
     pool.release(ctx)
     expect(pool.size).toBe(1)
@@ -22,7 +22,7 @@ describe('RexContextPool', () => {
   })
 
   it('release resets all per-request fields', () => {
-    const pool = new RexContextPool(8)
+    const pool = new RiftexContextPool(8)
     const ctx = pool.acquire()
     ctx.method = 'POST'
     ctx.url = '/foo?bar=baz'
@@ -50,7 +50,7 @@ describe('RexContextPool', () => {
   })
 
   it('respects max size — overflow contexts are discarded', () => {
-    const pool = new RexContextPool(2)
+    const pool = new RiftexContextPool(2)
     const a = pool.acquire()
     const b = pool.acquire()
     const c = pool.acquire()
@@ -62,7 +62,7 @@ describe('RexContextPool', () => {
   })
 
   it('size getter reflects current free-list length', () => {
-    const pool = new RexContextPool(4)
+    const pool = new RiftexContextPool(4)
     expect(pool.size).toBe(0)
     // Acquire two distinct fresh contexts THEN release both — that grows size.
     const a = pool.acquire()
@@ -77,18 +77,18 @@ describe('RexContextPool', () => {
   })
 
   it('acquire after pool overflow still allocates fresh contexts', () => {
-    const pool = new RexContextPool(1)
+    const pool = new RiftexContextPool(1)
     const a = pool.acquire()
     pool.release(a) // pool size = 1
     const b = pool.acquire() // reused (a)
     const c = pool.acquire() // pool empty -> fresh
     expect(b).toBe(a)
     expect(c).not.toBe(a)
-    expect(c).toBeInstanceOf(RexContext)
+    expect(c).toBeInstanceOf(RiftexContext)
   })
 
   it('default constructor admits at least 10 released contexts', () => {
-    const pool = new RexContextPool()
+    const pool = new RiftexContextPool()
     // Acquire all first (each is a fresh alloc since pool starts empty),
     // then release them — only release grows the free list.
     const ctxs = Array.from({ length: 10 }, () => pool.acquire())

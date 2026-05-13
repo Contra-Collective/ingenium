@@ -1,6 +1,6 @@
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 app.get('/', () => ({ ok: true }))
 
 const handle = await app.listen(0, '127.0.0.1')

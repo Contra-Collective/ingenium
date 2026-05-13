@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { connect as h2connect, constants as h2, type ClientHttp2Session } from 'node:http2'
 import { Buffer } from 'node:buffer'
-import { RexApp } from '../src/app.ts'
+import { RiftexApp } from '../src/app.ts'
 import { Http2cAdapter } from '../src/transport/http2.ts'
 import type { ListeningServer } from '../src/transport/types.ts'
 
@@ -51,7 +51,7 @@ describe('Http2cAdapter (h2c)', () => {
   let baseUrl: string
 
   beforeAll(async () => {
-    const app = new RexApp({ transport: new Http2cAdapter() })
+    const app = new RiftexApp({ transport: new Http2cAdapter() })
 
     app.get('/', (ctx) => {
       ctx.text('hello')
@@ -122,7 +122,7 @@ describe('Http2cAdapter (h2c)', () => {
   it('strips :status / :path / :method pseudo-headers from ctx.headers', async () => {
     // Re-bind a tiny app on a separate port — we want a handler that inspects
     // ctx.headers and returns the keys, so we can assert no `:` keys leak through.
-    const probeApp = new RexApp({ transport: new Http2cAdapter() })
+    const probeApp = new RiftexApp({ transport: new Http2cAdapter() })
     probeApp.get('/keys', (ctx) => {
       ctx.json({ keys: Object.keys(ctx.headers) })
     })

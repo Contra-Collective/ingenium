@@ -11,7 +11,7 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { Buffer } from 'node:buffer'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
 import type {
   CloseOptions,
@@ -110,7 +110,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, hooks: T
   }
 }
 
-function populateContext(ctx: RexContext, req: IncomingMessage): void {
+function populateContext(ctx: RiftexContext, req: IncomingMessage): void {
   ctx.method = (req.method ?? 'GET') as HttpMethod
   ctx.url = req.url ?? '/'
   const url = ctx.url
@@ -130,7 +130,7 @@ function populateContext(ctx: RexContext, req: IncomingMessage): void {
   ctx.body._attach(req, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
-function writeResponse(ctx: RexContext, res: ServerResponse): void {
+function writeResponse(ctx: RiftexContext, res: ServerResponse): void {
   res.statusCode = ctx._statusCode
 
   for (const name in ctx._headers) {

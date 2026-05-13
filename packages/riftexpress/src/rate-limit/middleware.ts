@@ -1,10 +1,10 @@
-import type { RexContext } from '../context/context.ts'
-import type { RexMiddleware } from '../middleware/types.ts'
+import type { RiftexContext } from '../context/context.ts'
+import type { RiftexMiddleware } from '../middleware/types.ts'
 import { MemoryStore } from './store.ts'
 import type { RateLimitOptions } from './types.ts'
 
 /** Default key generator — see RateLimitOptions.keyGenerator JSDoc. */
-function defaultKeyGenerator(ctx: RexContext): string {
+function defaultKeyGenerator(ctx: RiftexContext): string {
   const xff = ctx.headers['x-forwarded-for']
   if (typeof xff === 'string' && xff.length > 0) {
     const first = xff.split(',')[0]
@@ -28,7 +28,7 @@ function defaultKeyGenerator(ctx: RexContext): string {
  *   app.use(rateLimit({ max: 100, windowMs: 60_000 }))
  *   app.use('/auth', rateLimit({ max: 5, windowMs: 60_000 }))
  */
-export function rateLimit(opts: RateLimitOptions = {}): RexMiddleware {
+export function rateLimit(opts: RateLimitOptions = {}): RiftexMiddleware {
   const windowMs = opts.windowMs ?? 60_000
   const max = opts.max ?? 100
   const keyGenerator = opts.keyGenerator ?? defaultKeyGenerator

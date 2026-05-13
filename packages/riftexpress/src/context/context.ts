@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RexBody } from './body.ts'
+import { RiftexBody } from './body.ts'
 import type { HttpMethod } from '../router/types.ts'
 import { resolveForwarded, type ForwardedInfo, type TrustProxy } from '../proxy/trust.ts'
 
@@ -22,7 +22,7 @@ export type ResponseBody =
  * The `Params` generic is a phantom — it narrows `ctx.params` for typed
  * route handlers but is `Record<string, string>` at runtime.
  */
-export class RexContext<Params = Record<string, string>> {
+export class RiftexContext<Params = Record<string, string>> {
   // ───── Request ─────────────────────────────────────────────────────────
   /** HTTP method, uppercase. */
   method: HttpMethod = 'GET'
@@ -37,7 +37,7 @@ export class RexContext<Params = Record<string, string>> {
   /** Lowercased request headers (Node convention). */
   headers: IncomingHttpHeaders = {}
   /** Lazy body accessor. */
-  readonly body: RexBody = new RexBody()
+  readonly body: RiftexBody = new RiftexBody()
   /** Free-form per-request state for plugins/middleware (e.g. `ctx.user = ...`). */
   state: Record<string, unknown> = Object.create(null) as Record<string, unknown>
 

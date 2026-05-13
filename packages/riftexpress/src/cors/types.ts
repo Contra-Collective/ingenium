@@ -1,9 +1,9 @@
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /**
  * Function form of the `origin` option. Receives the request's `Origin`
  * header value (always a string — never called when no `Origin` is present)
- * and the active `RexContext`. May return:
+ * and the active `RiftexContext`. May return:
  *
  * - `true`  — allow the request, reflect the request's `Origin` back.
  * - `false` — deny the request (no `Access-Control-Allow-Origin` header set).
@@ -14,7 +14,7 @@ import type { RexContext } from '../context/context.ts'
  */
 export type CorsOriginFn = (
   origin: string,
-  ctx: RexContext,
+  ctx: RiftexContext,
 ) => boolean | string | Promise<boolean | string>
 
 /**
@@ -35,7 +35,7 @@ export type CorsOrigin =
   | CorsOriginFn
 
 /**
- * Options for `rex.cors`. All fields are optional. See README for details.
+ * Options for `riftex.cors`. All fields are optional. See README for details.
  */
 export interface CorsOptions {
   /** Origin policy. Default: `'*'`. */

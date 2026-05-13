@@ -30,7 +30,7 @@ export interface SessionOptions {
    *   key are re-signed with the active key on the next response.
    */
   secret: string | string[]
-  /** Name of the session cookie. @default 'rex.sid' */
+  /** Name of the session cookie. @default 'riftex.sid' */
   cookieName?: string
   /** Cookie / store TTL in seconds. @default 604800 (7 days) */
   maxAgeSeconds?: number

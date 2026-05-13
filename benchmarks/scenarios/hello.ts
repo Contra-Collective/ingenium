@@ -1,5 +1,5 @@
 import express from 'express'
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { runBench, printComparison, printHeader } from './_shared.js'
 
 const HOST = '127.0.0.1'
@@ -31,7 +31,7 @@ async function bootExpress(): Promise<{ port: number; close: () => Promise<void>
 }
 
 async function bootRift(): Promise<{ port: number; close: () => Promise<void> }> {
-  const app = rex()
+  const app = riftex()
   app.get('/', () => ({ ok: true }))
   const handle = await app.listen(0, HOST)
   return { port: handle.port, close: handle.close }

@@ -1,7 +1,7 @@
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 
 const LAYERS = 10
-const app = rex()
+const app = riftex()
 
 for (let i = 1; i <= LAYERS; i++) {
   const key = `layer${i}`

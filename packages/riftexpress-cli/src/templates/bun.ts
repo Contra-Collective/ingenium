@@ -52,18 +52,18 @@ dist
 bun.lockb
 `,
 
-  'src/index.ts': `import { rex, Router, type RexMiddleware } from 'riftexpress'
+  'src/index.ts': `import { riftex, Router, type RiftexMiddleware } from 'riftexpress'
 import { BunAdapter } from 'riftexpress-bun'
 
-const app = rex()
+const app = riftex()
 
-const logger: RexMiddleware = async (ctx, next) => {
+const logger: RiftexMiddleware = async (ctx, next) => {
   const start = Date.now()
   await next()
   console.log(\`\${ctx.method} \${ctx.path} -> \${Date.now() - start}ms\`)
 }
 app.use(logger)
-app.use(rex.json())
+app.use(riftex.json())
 
 app.get('/', () => 'Hello from \${NAME} (Bun)')
 app.get('/users/:id', (ctx) => ({ id: ctx.params.id }))

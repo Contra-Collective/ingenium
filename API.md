@@ -6,19 +6,19 @@ This is the locked public API for downstream code (tests, compat shim, examples,
 
 ```ts
 import {
-  rex,                       // function: creates RexApp
+  riftex,                       // function: creates RiftexApp
   Router,                    // function: creates a mountable Router
-  RexContext,                // class
-  RexBody,                   // class (on ctx.body)
-  RexError,
-  RexNotFoundError,
-  RexUnauthorizedError,
-  RexMethodNotAllowedError,
-  RexPayloadTooLargeError,
-  RexValidationError,
-  RexBadRequestError,
-  type RexHandler,
-  type RexMiddleware,
+  RiftexContext,                // class
+  RiftexBody,                   // class (on ctx.body)
+  RiftexError,
+  RiftexNotFoundError,
+  RiftexUnauthorizedError,
+  RiftexMethodNotAllowedError,
+  RiftexPayloadTooLargeError,
+  RiftexValidationError,
+  RiftexBadRequestError,
+  type RiftexHandler,
+  type RiftexMiddleware,
   type ExtractParams,
   type HttpMethod,
 } from 'riftexpress'
@@ -27,10 +27,10 @@ import {
 ## App
 
 ```ts
-const app = rex({ poolSize?: number })
+const app = riftex({ poolSize?: number })
 
-app.use(mw: RexMiddleware): this
-app.use(mountPath: string, mw: RexMiddleware | Router): this
+app.use(mw: RiftexMiddleware): this
+app.use(mountPath: string, mw: RiftexMiddleware | Router): this
 
 app.get(path, handler)
 app.post(path, handler)
@@ -40,14 +40,14 @@ app.delete(path, handler)
 app.head(path, handler)
 app.options(path, handler)
 
-app.onError((err: unknown, ctx: RexContext) => unknown | Promise<unknown>): this
+app.onError((err: unknown, ctx: RiftexContext) => unknown | Promise<unknown>): this
 app.compose(): void                       // explicit pre-warm; auto-runs lazily on first request
-app.handle(ctx: RexContext): Promise<void>  // dispatch entry, used by adapters
+app.handle(ctx: RiftexContext): Promise<void>  // dispatch entry, used by adapters
 app.listen(port: number, host?: string): Promise<{ port: number; close: () => Promise<void> }>
 
 // Built-in middleware (no install required):
-rex.json(opts?:    { limit?: number }): RexMiddleware     // sets ctx.body parsing default
-rex.urlencoded(opts?: { limit?: number }): RexMiddleware
+riftex.json(opts?:    { limit?: number }): RiftexMiddleware     // sets ctx.body parsing default
+riftex.urlencoded(opts?: { limit?: number }): RiftexMiddleware
 // Note: these are zero-cost no-ops in v0.0.1 — body parsing is lazy via
 // `ctx.body.json()` / `ctx.body.urlencoded()`. Provided for Express
 // migration ergonomics so existing `app.use(express.json())` lines compile.
@@ -64,10 +64,10 @@ r.use(mountPath, mw | Router)
 app.use('/api', r)           // mounts at /api — routes inside r get the prefix
 ```
 
-## RexContext
+## RiftexContext
 
 ```ts
-class RexContext<Params = Record<string, string>> {
+class RiftexContext<Params = Record<string, string>> {
   // Request
   method: HttpMethod
   url: string                 // path + ?query
@@ -76,7 +76,7 @@ class RexContext<Params = Record<string, string>> {
   query: URLSearchParams      // lazy parsed
   params: Params
   headers: IncomingHttpHeaders
-  body: RexBody
+  body: RiftexBody
   state: Record<string, unknown>  // free-form per-request scratch
 
   // Response setters (chainable: status, set/setHeader)
@@ -95,10 +95,10 @@ class RexContext<Params = Record<string, string>> {
 }
 ```
 
-## RexBody
+## RiftexBody
 
 ```ts
-class RexBody {
+class RiftexBody {
   json<T>(schema?: ZodLikeSchema<T>, maxBytes?: number): Promise<T>
   text(maxBytes?: number): Promise<string>
   urlencoded(maxBytes?: number): Promise<Record<string, string>>
@@ -106,14 +106,14 @@ class RexBody {
   stream(): Readable                                    // raw node:stream Readable
 }
 // Schema may be Zod (uses safeParse) or any { parse(input): T } compatible.
-// Validation failure throws RexValidationError with field-level `fields`.
+// Validation failure throws RiftexValidationError with field-level `fields`.
 ```
 
 ## Middleware
 
 ```ts
-type RexMiddleware = (ctx: RexContext, next: () => Promise<void>) => unknown | Promise<unknown>
-type RexHandler<P = Record<string, string>> = (ctx: RexContext<P>) => unknown | Promise<unknown>
+type RiftexMiddleware = (ctx: RiftexContext, next: () => Promise<void>) => unknown | Promise<unknown>
+type RiftexHandler<P = Record<string, string>> = (ctx: RiftexContext<P>) => unknown | Promise<unknown>
 ```
 
 Handler return values are reflected to the wire:
@@ -127,7 +127,7 @@ Handler return values are reflected to the wire:
 
 ## Errors
 
-All extend `RexError`. Default boundary serializes:
+All extend `RiftexError`. Default boundary serializes:
 ```json
 { "error": "<message>", "code": "<CODE>", "fields"?: { ... } }
 ```

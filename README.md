@@ -25,7 +25,7 @@ RiftExpress is what happens if you fix Express's three structural problems — l
 - [The 5-minute Express → RiftExpress diff](#the-5-minute-express--riftexpress-diff)
 - [Core concepts](#core-concepts)
   - [App + Router](#app--router)
-  - [RexContext](#rexcontext)
+  - [RiftexContext](#riftexcontext)
   - [Middleware](#middleware)
   - [Body parsing](#body-parsing)
   - [Response reflection](#response-reflection)
@@ -33,11 +33,11 @@ RiftExpress is what happens if you fix Express's three structural problems — l
   - [Plugins](#plugins)
   - [Trust-proxy](#trust-proxy)
 - [Built-in middleware](#built-in-middleware)
-  - [`rex.json` / `rex.urlencoded`](#rexjson--rexurlencoded)
-  - [`rex.static`](#rexstatic)
-  - [`rex.cors`](#rexcors)
-  - [`rex.sse` (Server-Sent Events)](#rexsse-server-sent-events)
-  - [`rex.rateLimit`](#rexratelimit)
+  - [`riftex.json` / `riftex.urlencoded`](#riftexjson--rexurlencoded)
+  - [`riftex.static`](#riftexstatic)
+  - [`riftex.cors`](#riftexcors)
+  - [`riftex.sse` (Server-Sent Events)](#riftexsse-server-sent-events)
+  - [`riftex.rateLimit`](#riftexratelimit)
   - [`sessionMiddleware`](#sessionmiddleware)
 - [Transports](#transports)
   - [Node `http` (default)](#node-http-default)
@@ -63,9 +63,9 @@ RiftExpress is what happens if you fix Express's three structural problems — l
 ## Show me the code
 
 ```ts
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 
 app.use(async (ctx, next) => {
   const start = Date.now()
@@ -91,7 +91,7 @@ That's a full server. No `res.send`. No `body-parser`. No `app.set('case sensiti
 |---|---|---|---|
 | Router speed at 1000 routes | O(n) linear scan | O(k) trie | O(k) radix trie + wildcard backtrack |
 | `req` / `res` types | `any` in practice | strict, but unfamiliar surface | strict, Express-shaped |
-| Per-request allocation | new `req`/`res`/`next` each request | varies | pooled `RexContext`, lazy getters |
+| Per-request allocation | new `req`/`res`/`next` each request | varies | pooled `RiftexContext`, lazy getters |
 | Middleware composition | re-walked per request | compose-on-register | lazy compose with dirty-bit recompose |
 | Body parsing | `body-parser` middleware always runs | always-on parsing | lazy via `ctx.body.json()` |
 | Default body size limit | 100 KB (`body-parser`) | varies | 100 KB (matches Express) |
@@ -151,7 +151,7 @@ npm install riftexpress riftexpress-compat
 
 # Project scaffolder
 npm install -g riftexpress-cli
-rex new my-api
+riftex new my-api
 ```
 
 **Requirements:** Node 20+. Bun 1.1+ for the Bun adapter. WebSocket support requires installing `ws` as a peer dep.
@@ -162,10 +162,10 @@ rex new my-api
 
 ```ts
 // Express                                      // RiftExpress
-import express from 'express'                   import { rex } from 'riftexpress'
-const app = express()                           const app = rex()
+import express from 'express'                   import { riftex } from 'riftexpress'
+const app = express()                           const app = riftex()
 
-app.use(express.json())                         app.use(rex.json())  // (no-op, parsing is lazy)
+app.use(express.json())                         app.use(riftex.json())  // (no-op, parsing is lazy)
 
 app.use((req, res, next) => {                   app.use(async (ctx, next) => {
   req.startedAt = Date.now()                      ctx.state.startedAt = Date.now()
@@ -182,7 +182,7 @@ app.post('/users', (req, res) => {              app.post('/users', async (ctx) =
   res.status(201).json(user)                      return ctx.json(user, 201)
 })                                              })
 
-const r = express.Router()                      const r = rex.Router()
+const r = express.Router()                      const r = riftex.Router()
 r.get('/health', (req, res) => res.json({ok:1}))r.get('/health', () => ({ ok: 1 }))
 app.use('/api', r)                              app.use('/api', r)
 
@@ -195,7 +195,7 @@ app.listen(3000)                                await app.listen(3000)
 
 Breakable changes:
 1. **Handlers may return values.** `return obj` is `res.json(obj)`; `return 'text'` is `res.text(...)`. Calling `ctx.json(...)` explicitly still works.
-2. **Body parsing is lazy.** `app.use(rex.json())` is a no-op stub for ergonomics; the actual parse happens in `ctx.body.json()` inside your handler.
+2. **Body parsing is lazy.** `app.use(riftex.json())` is a no-op stub for ergonomics; the actual parse happens in `ctx.body.json()` inside your handler.
 3. **`ctx.state` is the per-request scratch space**, not `ctx.user = ...` directly (though plugins can decorate `ctx` to enable that).
 
 That's the whole list. Everything else from the Express mental model carries over verbatim.
@@ -207,9 +207,9 @@ That's the whole list. Everything else from the Express mental model carries ove
 ### App + Router
 
 ```ts
-import { rex, Router } from 'riftexpress'
+import { riftex, Router } from 'riftexpress'
 
-const app = rex({ poolSize: 1024, trustProxy: false })
+const app = riftex({ poolSize: 1024, trustProxy: false })
 
 // HTTP methods — same surface as Express
 app.get('/', handler)
@@ -242,10 +242,10 @@ await server.close({ gracefulTimeoutMs: 10_000 })
 
 **Composition timing.** Registration is journaled, not eagerly composed. The trie + composed handlers are built on first request (or via `app.compose()`). Adding routes after `listen()` sets a dirty bit and triggers recompose on the next request — tests that register routes per-test work without ceremony.
 
-### RexContext
+### RiftexContext
 
 ```ts
-class RexContext<Params = Record<string, string>> {
+class RiftexContext<Params = Record<string, string>> {
   // Request
   method: HttpMethod              // 'GET' | 'POST' | ...
   url: string                     // path + ?query
@@ -254,7 +254,7 @@ class RexContext<Params = Record<string, string>> {
   query: URLSearchParams          // lazy
   params: Params                  // route params
   headers: IncomingHttpHeaders    // lowercased per Node convention
-  body: RexBody                   // lazy parsers
+  body: RiftexBody                   // lazy parsers
   state: Record<string, unknown>  // per-request scratch
 
   // Network info (trust-proxy aware)
@@ -287,7 +287,7 @@ The class is pool-bound: one instance per pool slot, reused across requests. `re
 ### Middleware
 
 ```ts
-type RexMiddleware = (ctx: RexContext, next: () => Promise<void>) => unknown | Promise<unknown>
+type RiftexMiddleware = (ctx: RiftexContext, next: () => Promise<void>) => unknown | Promise<unknown>
 ```
 
 Same dispatch model as Koa: `await next()` in the middle, do work before/after. Errors thrown anywhere in the chain bubble up to `app.onError`.
@@ -308,7 +308,7 @@ Default `maxBytes` is **100,000** (matches Express's `body-parser` default). Ove
 2. Zod-like `safeParse(input)`
 3. Plain `parse(input): T`
 
-Validation failures throw `RexValidationError` with a `fields` map. Body-too-large throws `RexPayloadTooLargeError` mid-stream (no post-buffer rejection).
+Validation failures throw `RiftexValidationError` with a `fields` map. Body-too-large throws `RiftexPayloadTooLargeError` mid-stream (no post-buffer rejection).
 
 ### Response reflection
 
@@ -327,37 +327,37 @@ If a `ctx.json/text/html/send/redirect/stream` helper has been called, the retur
 
 ```ts
 import {
-  RexError,
-  RexNotFoundError,        // 404
-  RexUnauthorizedError,    // 401
-  RexMethodNotAllowedError,// 405 (auto-thrown on path match + method miss)
-  RexPayloadTooLargeError, // 413
-  RexValidationError,      // 422 with .fields
-  RexBadRequestError,      // 400
+  RiftexError,
+  RiftexNotFoundError,        // 404
+  RiftexUnauthorizedError,    // 401
+  RiftexMethodNotAllowedError,// 405 (auto-thrown on path match + method miss)
+  RiftexPayloadTooLargeError, // 413
+  RiftexValidationError,      // 422 with .fields
+  RiftexBadRequestError,      // 400
 } from 'riftexpress'
 
 app.onError((err, ctx) => {
-  if (err instanceof RexValidationError) {
+  if (err instanceof RiftexValidationError) {
     return ctx.json({ error: err.message, fields: err.fields }, 422)
   }
-  if (err instanceof RexError) throw err  // delegate to default boundary
+  if (err instanceof RiftexError) throw err  // delegate to default boundary
   ctx.json({ error: 'internal' }, 500)
 })
 ```
 
-The default boundary serializes any `RexError` as `{ error, code, fields? }` with the right status. Unknown errors become 500s. `RexMethodNotAllowedError` writes the `Allow` response header automatically.
+The default boundary serializes any `RiftexError` as `{ error, code, fields? }` with the right status. Unknown errors become 500s. `RiftexMethodNotAllowedError` writes the `Allow` response header automatically.
 
 ### Plugins
 
 ```ts
-import { rex, type RexPlugin } from 'riftexpress'
+import { riftex, type RiftexPlugin } from 'riftexpress'
 
 interface User { id: string; email: string }
 
-const auth: RexPlugin<{ secret: string }> = (app, opts) => {
+const auth: RiftexPlugin<{ secret: string }> = (app, opts) => {
   app.decorate('user', async (ctx) => {
     const token = ctx.headers.authorization?.split(' ')[1]
-    if (!token) throw new RexUnauthorizedError()
+    if (!token) throw new RiftexUnauthorizedError()
     return verifyToken(token, opts.secret) as User
   })
   app.hooks.onRequest((ctx) => {
@@ -365,11 +365,11 @@ const auth: RexPlugin<{ secret: string }> = (app, opts) => {
   })
 }
 
-const app = rex()
+const app = riftex()
 await app.register(auth, { secret: process.env.JWT_SECRET! })
 
 declare module 'riftexpress' {
-  interface RexContext {
+  interface RiftexContext {
     user: User
   }
 }
@@ -382,7 +382,7 @@ Lifecycle hooks: `onRoute`, `onCompose`, `onRequest`, `onResponse`, `onError`. D
 ### Trust-proxy
 
 ```ts
-const app = rex({ trustProxy: 'loopback' })
+const app = riftex({ trustProxy: 'loopback' })
 
 // Then in handlers:
 ctx.ip          // real client IP after walking the X-Forwarded-For chain
@@ -408,14 +408,14 @@ Mirrors Express's `app.set('trust proxy', ...)`:
 
 ## Built-in middleware
 
-### `rex.json` / `rex.urlencoded`
+### `riftex.json` / `riftex.urlencoded`
 
 Stub middleware for Express compatibility. Body parsing is lazy via `ctx.body.json()` / `ctx.body.urlencoded()`, so these are no-ops. They exist so existing Express migration code (`app.use(express.json())`) compiles and reads naturally.
 
-### `rex.static`
+### `riftex.static`
 
 ```ts
-app.use(rex.static('./public', {
+app.use(riftex.static('./public', {
   index: 'index.html',     // default; set false to disable
   maxAge: 60_000,          // ms — sets Cache-Control: public, max-age=60
   extensions: ['html'],    // try /foo + /foo.html when /foo not found
@@ -425,10 +425,10 @@ app.use(rex.static('./public', {
 
 Ships with weak ETags (`W/"size-mtime"`), conditional GET (`If-None-Match` → 304), range requests (`Range: bytes=N-M` → 206), MIME from extension (extensible map), and path-traversal protection (`../etc/passwd` → 403).
 
-### `rex.cors`
+### `riftex.cors`
 
 ```ts
-app.use(rex.cors({
+app.use(riftex.cors({
   origin: 'https://app.example.com',  // or true | string[] | RegExp | (origin, ctx) => boolean | string | Promise<>
   methods: ['GET', 'POST', 'PUT'],    // default: GET HEAD PUT PATCH POST DELETE
   allowedHeaders: ['x-trace-id'],     // default: mirror Access-Control-Request-Headers
@@ -441,10 +441,10 @@ app.use(rex.cors({
 
 Handles simple requests, preflights (responds 204 with negotiated methods/headers, does NOT call `next()`), and `Vary: Origin` whenever the origin is reflected from the request.
 
-### `rex.sse` (Server-Sent Events)
+### `riftex.sse` (Server-Sent Events)
 
 ```ts
-import { rex, sse, startKeepAlive } from 'riftexpress'
+import { riftex, sse, startKeepAlive } from 'riftexpress'
 
 app.get('/events', (ctx) => {
   const stream = sse(ctx)
@@ -463,10 +463,10 @@ app.get('/events', (ctx) => {
 
 `SseStream` API: `send(event | string)`, `comment(text)`, `close()`, `closed: boolean`. Multi-line `data` is split per spec. Object data is JSON-stringified.
 
-### `rex.rateLimit`
+### `riftex.rateLimit`
 
 ```ts
-app.use(rex.rateLimit({
+app.use(riftex.rateLimit({
   windowMs: 60_000,
   limit: 100,
   // default keygen reads X-Forwarded-For — make sure trustProxy is set!
@@ -484,14 +484,14 @@ import { sessionMiddleware, type Session } from 'riftexpress'
 
 app.use(sessionMiddleware({
   secret: [process.env.SESSION_SECRET!, ...rotatedSecrets],
-  cookieName: 'rex.sid',
+  cookieName: 'riftex.sid',
   maxAgeSeconds: 7 * 86_400,
   rolling: false,
   cookie: { secure: true, sameSite: 'lax', httpOnly: true },
 }))
 
 declare module 'riftexpress' {
-  interface RexContext { session: Session }
+  interface RiftexContext { session: Session }
 }
 
 app.post('/login', async (ctx) => {
@@ -516,36 +516,36 @@ HMAC-SHA256-signed cookies, 18-byte (144-bit) ids, `crypto.timingSafeEqual` veri
 ### Node `http` (default)
 
 ```ts
-const app = rex()
+const app = riftex()
 const server = await app.listen(3000)
 ```
 
-Uses `node:http` directly. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to the `RexContext`, and the `RexContext` straight to the `ServerResponse`.
+Uses `node:http` directly. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to the `RiftexContext`, and the `RiftexContext` straight to the `ServerResponse`.
 
 ### Bun.serve
 
 ```ts
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { BunAdapter } from 'riftexpress-bun'
 
-const app = rex({ transport: new BunAdapter() })
+const app = riftex({ transport: new BunAdapter() })
 await app.listen(3000)
 ```
 
-Wraps `Bun.serve()` with a Web-Streams ↔ `node:stream` bridge so existing `RexBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called.
+Wraps `Bun.serve()` with a Web-Streams ↔ `node:stream` bridge so existing `RiftexBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called.
 
 ### HTTP/2 (h2 + h2c)
 
 ```ts
-import { rex, Http2Adapter, Http2cAdapter } from 'riftexpress'
+import { riftex, Http2Adapter, Http2cAdapter } from 'riftexpress'
 import { readFileSync } from 'node:fs'
 
 // h2c (cleartext HTTP/2)
-const app = rex({ transport: new Http2cAdapter() })
+const app = riftex({ transport: new Http2cAdapter() })
 await app.listen(3000)
 
 // h2 (TLS)
-const tlsApp = rex({
+const tlsApp = riftex({
   transport: new Http2Adapter({
     cert: readFileSync('cert.pem'),
     key: readFileSync('key.pem'),
@@ -566,9 +566,9 @@ npm install ws @types/ws
 ```
 
 ```ts
-import { rex, enableWebSockets } from 'riftexpress'
+import { riftex, enableWebSockets } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 enableWebSockets(app)
 
 app.ws('/echo', (sock) => {
@@ -588,9 +588,9 @@ Uses `WebSocketServer({ noServer: true })` and hooks the `upgrade` event on the 
 ### Graceful shutdown
 
 ```ts
-import { rex, gracefulShutdown } from 'riftexpress'
+import { riftex, gracefulShutdown } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 const server = await app.listen(3000)
 
 gracefulShutdown(server, {
@@ -614,12 +614,12 @@ npm install riftexpress riftexpress-compat cors helmet
 ```
 
 ```ts
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { expressCompat } from 'riftexpress-compat'
 import cors from 'cors'
 import helmet from 'helmet'
 
-const app = rex()
+const app = riftex()
 app.use(expressCompat(cors({ origin: 'https://app.example.com' })))
 app.use(expressCompat(helmet()))
 ```
@@ -650,12 +650,12 @@ Full matrix and failure modes in [`packages/riftexpress-compat/COMPATIBILITY.md`
 ```sh
 npm install -g riftexpress-cli
 
-rex new my-api                      # default template
-rex new my-bun-api --bun            # uses BunAdapter
-rex new tiny --minimal              # 10-line hello world
-rex new my-api --force              # overwrite existing dir
-rex --version
-rex --help
+riftex new my-api                      # default template
+riftex new my-bun-api --bun            # uses BunAdapter
+riftex new tiny --minimal              # 10-line hello world
+riftex new my-api --force              # overwrite existing dir
+riftex --version
+riftex --help
 ```
 
 Templates ship with: `package.json`, `tsconfig.json`, `.gitignore`, `src/index.ts`, `README.md`. Zero runtime dependencies (only Node built-ins). Requires Node 22+ (uses `--experimental-strip-types`).
@@ -687,7 +687,7 @@ const User = {
 app.post('/users', async (ctx) => ctx.body.json(User))
 ```
 
-All three throw `RexValidationError` with a `fields: Record<string, string>` map on failure. Standard Schema v1 issues with structured paths are dot-joined (`['user', 'email']` → `'user.email'`).
+All three throw `RiftexValidationError` with a `fields: Record<string, string>` map on failure. Standard Schema v1 issues with structured paths are dot-joined (`['user', 'email']` → `'user.email'`).
 
 ---
 
@@ -718,10 +718,10 @@ npm run dev
 
 | Package | Description |
 |---|---|
-| [`riftexpress`](packages/riftexpress) | Core framework — `rex()`, `Router`, `RexContext`, plugins, static, CORS, SSE, rate-limit, sessions, multipart, transports |
+| [`riftexpress`](packages/riftexpress) | Core framework — `riftex()`, `Router`, `RiftexContext`, plugins, static, CORS, SSE, rate-limit, sessions, multipart, transports |
 | [`riftexpress-compat`](packages/riftexpress-compat) | `expressCompat(mw)` shim for `(req, res, next)` middleware |
 | [`riftexpress-bun`](packages/riftexpress-bun) | `BunAdapter` — drop-in transport for `Bun.serve()` |
-| [`riftexpress-cli`](packages/riftexpress-cli) | `rex new <name> [--bun\|--minimal]` scaffolder |
+| [`riftexpress-cli`](packages/riftexpress-cli) | `riftex new <name> [--bun\|--minimal]` scaffolder |
 
 Each package is independently publishable to npm.
 
@@ -758,7 +758,7 @@ riftexpress/
 │   ├── riftexpress/              # core
 │   ├── riftexpress-compat/       # Express middleware shim
 │   ├── riftexpress-bun/          # Bun.serve adapter
-│   └── riftexpress-cli/          # rex new scaffolder
+│   └── riftexpress-cli/          # riftex new scaffolder
 ├── apps/
 │   └── notes-api/                # reference CRUD service
 ├── examples/

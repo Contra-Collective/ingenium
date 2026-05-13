@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import * as path from 'node:path'
 import type { Stats } from 'node:fs'
-import type { RexMiddleware } from '../middleware/types.ts'
+import type { RiftexMiddleware } from '../middleware/types.ts'
 import type { StaticOptions } from './types.ts'
 
 /**
@@ -84,9 +84,9 @@ function parseRange(
  * write 404 themselves, so downstream routes still get a chance.
  *
  * @example
- *   app.use(rex.static('./public', { maxAge: 60_000 }))
+ *   app.use(riftex.static('./public', { maxAge: 60_000 }))
  */
-export function staticMiddleware(root: string, opts: StaticOptions = {}): RexMiddleware {
+export function staticMiddleware(root: string, opts: StaticOptions = {}): RiftexMiddleware {
   const absRoot = path.resolve(root)
   const indexFile = opts.index === undefined ? DEFAULT_INDEX : opts.index
   const maxAgeMs = opts.maxAge ?? 0

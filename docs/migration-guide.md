@@ -1,6 +1,6 @@
 # Express → RiftExpress Migration Guide
 
-RiftExpress (`rex`) is a small, typed HTTP framework with an Express-shaped API and a lazy-composed middleware pipeline. Most Express code ports over by renaming `app` → `rex()` and dropping the `req, res, next` triple for a single `ctx`. There is **one intentional breaking change**: handlers return values instead of calling `res.send` / `res.json`. Whatever you `return` from a handler is reflected to the wire (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204). You can still call `ctx.json(...)` etc. explicitly when you want control over status or headers.
+RiftExpress (`riftex`) is a small, typed HTTP framework with an Express-shaped API and a lazy-composed middleware pipeline. Most Express code ports over by renaming `app` → `riftex()` and dropping the `req, res, next` triple for a single `ctx`. There is **one intentional breaking change**: handlers return values instead of calling `res.send` / `res.json`. Whatever you `return` from a handler is reflected to the wire (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204). You can still call `ctx.json(...)` etc. explicitly when you want control over status or headers.
 
 ---
 
@@ -18,8 +18,8 @@ app.listen(3000)
 
 ```ts
 // RiftExpress
-import { rex } from 'riftexpress'
-const app = rex()
+import { riftex } from 'riftexpress'
+const app = riftex()
 app.get('/', (ctx) => 'hello')
 await app.listen(3000)
 ```
@@ -80,7 +80,7 @@ app.post('/users', (req, res) => {
 ```
 
 ```ts
-// RiftExpress — parsing is lazy; rex.json() is a no-op stub for compat.
+// RiftExpress — parsing is lazy; riftex.json() is a no-op stub for compat.
 app.post('/users', async (ctx) => {
   const body = await ctx.body.json()
   return body
@@ -112,7 +112,7 @@ app.post('/users', async (ctx) => {
 })
 ```
 
-A failed parse throws `RexValidationError` with a `fields` map.
+A failed parse throws `RiftexValidationError` with a `fields` map.
 
 ---
 
@@ -225,13 +225,13 @@ RiftExpress has a dedicated `onError`:
 
 ```ts
 // RiftExpress
-import { RexError, RexValidationError } from 'riftexpress'
+import { RiftexError, RiftexValidationError } from 'riftexpress'
 
 app.onError((err, ctx) => {
-  if (err instanceof RexValidationError) {
+  if (err instanceof RiftexValidationError) {
     return ctx.json({ error: err.message, fields: err.fields }, 422)
   }
-  if (err instanceof RexError) throw err  // re-throw to default boundary
+  if (err instanceof RiftexError) throw err  // re-throw to default boundary
   ctx.json({ error: 'internal' }, 500)
 })
 ```
@@ -243,14 +243,14 @@ Re-throwing falls back to the default JSON error boundary
 
 ## 404 handling
 
-Unmatched routes throw `RexNotFoundError`, which the default boundary
+Unmatched routes throw `RiftexNotFoundError`, which the default boundary
 serializes as a 404. To customize:
 
 ```ts
-import { RexNotFoundError } from 'riftexpress'
+import { RiftexNotFoundError } from 'riftexpress'
 
 app.onError((err, ctx) => {
-  if (err instanceof RexNotFoundError) {
+  if (err instanceof RiftexNotFoundError) {
     return ctx.html('<h1>nope</h1>', 404)
   }
   throw err
@@ -277,17 +277,17 @@ app.use(express.static('./public'))
 
 ```ts
 // RiftExpress
-app.use(rex.static('./public'))
+app.use(riftex.static('./public'))
 ```
 
-`rex.static(root, opts?)` ships with ETag, conditional GET (`If-None-Match`),
+`riftex.static(root, opts?)` ships with ETag, conditional GET (`If-None-Match`),
 range requests, MIME detection from extension, and a configurable directory
 index (default `index.html`). Options include `index`, `maxAge` (milliseconds,
 matching Express's convention), `extensions`, and `dotfiles` (`'allow' |
 'deny' | 'ignore'`, default `'ignore'`).
 
 ```ts
-app.use('/assets', rex.static('./public', {
+app.use('/assets', riftex.static('./public', {
   maxAge: 60_000,
   extensions: ['html'],
   dotfiles: 'deny',
@@ -300,15 +300,15 @@ app.use('/assets', rex.static('./public', {
 
 Pure-function Express middleware (cors, helmet, morgan, compression-ish
 logic) works through the compat shim, which adapts the `(req, res, next)`
-signature onto a `RexContext`.
+signature onto a `RiftexContext`.
 
 ```ts
-import { rex } from 'riftexpress'
+import { riftex } from 'riftexpress'
 import { expressCompat } from 'riftexpress-compat'
 import cors from 'cors'
 import helmet from 'helmet'
 
-const app = rex()
+const app = riftex()
 app.use(expressCompat(cors({ origin: 'https://example.com' })))
 app.use(expressCompat(helmet()))
 ```
@@ -345,7 +345,7 @@ shim and need native ports (or replacement) before v1.0:
   pattern — throw, or `await next()` and inspect after. Sync middleware
   still works (you don't have to mark it `async`), but `next()` always
   returns a `Promise<void>`.
-- **`rex.json()` and `rex.urlencoded()` are no-op stubs.** Body parsing is
+- **`riftex.json()` and `riftex.urlencoded()` are no-op stubs.** Body parsing is
   lazy via `ctx.body.json()` / `ctx.body.urlencoded()`. The functions
   exist so `app.use(express.json())` lines port mechanically; they don't
   install a parser, configure limits, or mutate `ctx.body`. Pass
@@ -392,9 +392,9 @@ five-nines availability this way.
 RiftExpress ships a tiny helper you call once after `listen()`:
 
 ```ts
-import { rex, gracefulShutdown } from 'riftexpress'
+import { riftex, gracefulShutdown } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 // ... routes ...
 const server = await app.listen(3000)
 

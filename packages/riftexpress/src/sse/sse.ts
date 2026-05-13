@@ -1,5 +1,5 @@
 import { PassThrough } from 'node:stream'
-import type { RexContext } from '../context/context.ts'
+import type { RiftexContext } from '../context/context.ts'
 
 /**
  * A single Server-Sent Event. The `data` field is required; if you pass an
@@ -49,7 +49,7 @@ export interface SseStream {
  *     setTimeout(() => stream.close(), 1000)
  *   })
  */
-export function sse(ctx: RexContext): SseStream {
+export function sse(ctx: RiftexContext): SseStream {
   const passthrough = new PassThrough()
 
   // SSE headers — set BEFORE ctx.stream() so the adapter can flush them.

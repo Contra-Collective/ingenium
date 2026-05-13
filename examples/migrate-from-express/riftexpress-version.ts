@@ -6,20 +6,20 @@
 // handlers may RETURN a value instead of calling res.json/res.send.
 
 import {
-  rex,
+  riftex,
   Router,
   gracefulShutdown,
-  type RexMiddleware,
+  type RiftexMiddleware,
 } from 'riftexpress'
 
-const app = rex()
+const app = riftex()
 
 // JSON body parsing — accepted as a no-op for migration ergonomics.
 // Body is actually parsed lazily via `ctx.body.json()` inside the handler.
-app.use(rex.json())
+app.use(riftex.json())
 
 // Logger middleware.
-const logger: RexMiddleware = async (ctx, next) => {
+const logger: RiftexMiddleware = async (ctx, next) => {
   const start = Date.now()
   await next()
   console.log(`${ctx.method} ${ctx.path} -> ${Date.now() - start}ms`)

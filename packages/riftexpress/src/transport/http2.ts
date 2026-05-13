@@ -40,7 +40,7 @@ export interface Http2AdapterOptions {
  * Browsers REQUIRE TLS for HTTP/2 — there is no cleartext HTTP/2 negotiation
  * over the open web. For local testing without certs, use {@link Http2cAdapter}.
  *
- * Per-request: on `'stream'`, populates a pooled `RexContext` from pseudo-headers,
+ * Per-request: on `'stream'`, populates a pooled `RiftexContext` from pseudo-headers,
  * awaits dispatch, then writes the response via `stream.respond()` + `stream.end()`
  * (or pipes for `Readable` bodies).
  */

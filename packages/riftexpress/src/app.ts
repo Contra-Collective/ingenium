@@ -1,19 +1,19 @@
-import { RexContext } from './context/context.ts'
-import { RexContextPool } from './context/pool.ts'
+import { RiftexContext } from './context/context.ts'
+import { RiftexContextPool } from './context/pool.ts'
 import {
-  RexError,
-  RexMethodNotAllowedError,
-  RexNotFoundError,
+  RiftexError,
+  RiftexMethodNotAllowedError,
+  RiftexNotFoundError,
 } from './errors.ts'
 import { composeWithHandler } from './middleware/compose.ts'
-import type { RexHandler, RexMiddleware } from './middleware/types.ts'
+import type { RiftexHandler, RiftexMiddleware } from './middleware/types.ts'
 import { DecoratorRegistry } from './plugin/decorators.ts'
 import { HooksRegistry } from './plugin/hooks.ts'
 import type {
   EagerDecorator,
   Hooks,
   LazyDecorator,
-  RexPlugin,
+  RiftexPlugin,
 } from './plugin/types.ts'
 import { Router, flattenRouter } from './router/router.ts'
 import { EMPTY_PARAMS, RouterTrie, type MatchMiss } from './router/trie.ts'
@@ -21,9 +21,9 @@ import type { HttpMethod } from './router/types.ts'
 import { NodeAdapter } from './transport/node.ts'
 import type { ListeningServer, Transport } from './transport/types.ts'
 
-/** Options accepted by `rex(...)` and `new RexApp(...)`. */
-export interface RexAppOptions {
-  /** Max number of pooled `RexContext` instances kept in the free list. Default 1024. */
+/** Options accepted by `riftex(...)` and `new RiftexApp(...)`. */
+export interface RiftexAppOptions {
+  /** Max number of pooled `RiftexContext` instances kept in the free list. Default 1024. */
   poolSize?: number
   /** Inject a custom transport (e.g. for tests). Default: `NodeAdapter`. */
   transport?: Transport
@@ -39,7 +39,7 @@ export interface RexAppOptions {
 }
 
 /** A user-supplied error handler. Return a non-error or call a `ctx` writer to recover. */
-export type RexErrorHandler = (err: unknown, ctx: RexContext) => unknown | Promise<unknown>
+export type RiftexErrorHandler = (err: unknown, ctx: RiftexContext) => unknown | Promise<unknown>
 
 /**
  * The RiftExpress application. Combines a `Router` (registration journal),
@@ -48,20 +48,20 @@ export type RexErrorHandler = (err: unknown, ctx: RexContext) => unknown | Promi
  * on first request (or when `compose()` is called explicitly), and a dirty
  * bit triggers recomposition if registrations are added later.
  */
-export class RexApp {
-  private readonly pool: RexContextPool
+export class RiftexApp {
+  private readonly pool: RiftexContextPool
   private readonly transport: Transport
   private readonly router: Router = new Router()
   private trie: RouterTrie = new RouterTrie()
   private dirty = true
-  private errorHandler: RexErrorHandler | null = null
+  private errorHandler: RiftexErrorHandler | null = null
   private readonly _hooks: HooksRegistry = new HooksRegistry()
   private readonly _decorators: DecoratorRegistry = new DecoratorRegistry()
-  /** @internal Carried onto each `RexContext` so its `ip`/`protocol`/`hostname` getters can resolve. */
+  /** @internal Carried onto each `RiftexContext` so its `ip`/`protocol`/`hostname` getters can resolve. */
   private readonly _trustProxy: import('./proxy/trust.ts').TrustProxy
 
-  constructor(options: RexAppOptions = {}) {
-    this.pool = new RexContextPool(options.poolSize ?? 1024)
+  constructor(options: RiftexAppOptions = {}) {
+    this.pool = new RiftexContextPool(options.poolSize ?? 1024)
     this.transport = options.transport ?? new NodeAdapter()
     this._trustProxy = options.trustProxy ?? false
   }
@@ -78,9 +78,9 @@ export class RexApp {
    * first request); registering a plugin sets the dirty bit so the next
    * request will recompose.
    */
-  register<O>(plugin: RexPlugin<O>, opts: O): Promise<this>
-  register(plugin: RexPlugin<void>): Promise<this>
-  async register<O>(plugin: RexPlugin<O>, opts?: O): Promise<this> {
+  register<O>(plugin: RiftexPlugin<O>, opts: O): Promise<this>
+  register(plugin: RiftexPlugin<void>): Promise<this>
+  async register<O>(plugin: RiftexPlugin<O>, opts?: O): Promise<this> {
     await plugin(this, opts as O)
     this.dirty = true
     return this
@@ -112,12 +112,12 @@ export class RexApp {
 
   // ───── Registration (delegates to the inner Router) ─────────────────────
 
-  use(mw: RexMiddleware): this
-  use(prefix: string, mw: RexMiddleware | Router): this
-  use(arg1: string | RexMiddleware, arg2?: RexMiddleware | Router): this {
+  use(mw: RiftexMiddleware): this
+  use(prefix: string, mw: RiftexMiddleware | Router): this
+  use(arg1: string | RiftexMiddleware, arg2?: RiftexMiddleware | Router): this {
     if (typeof arg1 === 'string') {
       // Overload preserved by passing both args verbatim.
-      this.router.use(arg1, arg2 as RexMiddleware | Router)
+      this.router.use(arg1, arg2 as RiftexMiddleware | Router)
     } else {
       this.router.use(arg1)
     }
@@ -125,23 +125,23 @@ export class RexApp {
     return this
   }
 
-  get(path: string, handler: RexHandler): this { return this.method('GET', path, handler) }
-  post(path: string, handler: RexHandler): this { return this.method('POST', path, handler) }
-  put(path: string, handler: RexHandler): this { return this.method('PUT', path, handler) }
-  patch(path: string, handler: RexHandler): this { return this.method('PATCH', path, handler) }
-  delete(path: string, handler: RexHandler): this { return this.method('DELETE', path, handler) }
-  head(path: string, handler: RexHandler): this { return this.method('HEAD', path, handler) }
-  options(path: string, handler: RexHandler): this { return this.method('OPTIONS', path, handler) }
+  get(path: string, handler: RiftexHandler): this { return this.method('GET', path, handler) }
+  post(path: string, handler: RiftexHandler): this { return this.method('POST', path, handler) }
+  put(path: string, handler: RiftexHandler): this { return this.method('PUT', path, handler) }
+  patch(path: string, handler: RiftexHandler): this { return this.method('PATCH', path, handler) }
+  delete(path: string, handler: RiftexHandler): this { return this.method('DELETE', path, handler) }
+  head(path: string, handler: RiftexHandler): this { return this.method('HEAD', path, handler) }
+  options(path: string, handler: RiftexHandler): this { return this.method('OPTIONS', path, handler) }
 
   /** Register a route under any HTTP method. */
-  method(method: HttpMethod, path: string, handler: RexHandler): this {
+  method(method: HttpMethod, path: string, handler: RiftexHandler): this {
     this.router.method(method, path, handler)
     this.dirty = true
     return this
   }
 
   /** Register a global error handler. Re-throw to delegate to the default boundary. */
-  onError(handler: RexErrorHandler): this {
+  onError(handler: RiftexErrorHandler): this {
     this.errorHandler = handler
     return this
   }
@@ -153,6 +153,9 @@ export class RexApp {
    * handlers at every leaf. Auto-runs on first request; safe to call
    * explicitly to pre-warm.
    */
+  /** Cached flat registrations — used to build the on-miss fallback chain. */
+  private _flat: ReturnType<typeof flattenRouter> | null = null
+
   compose(): void {
     // Note: this entry is synchronous. Async `onCompose` hooks are awaited
     // by `composeAsync()` (the path used by `handle()` and `listen()`).
@@ -165,7 +168,7 @@ export class RexApp {
       const node = trie.insert(route.path)
 
       // Determine which middleware applies to this route's path.
-      const applicable: RexMiddleware[] = [...flat.globalMiddleware]
+      const applicable: RiftexMiddleware[] = [...flat.globalMiddleware]
       for (const scoped of flat.scopedMiddleware) {
         if (pathStartsWith(route.path, scoped.prefix)) {
           applicable.push(scoped.mw)
@@ -181,6 +184,7 @@ export class RexApp {
     }
 
     this.trie = trie
+    this._flat = flat
     this.dirty = false
   }
 
@@ -204,7 +208,7 @@ export class RexApp {
    * for populating the request side of the context and writing the response
    * side after this resolves.
    */
-  async handle(ctx: RexContext): Promise<void> {
+  async handle(ctx: RiftexContext): Promise<void> {
     if (this.dirty) await this.composeAsync()
 
     // Stamp trust-proxy config so ctx.ip/protocol/hostname resolve correctly.
@@ -239,8 +243,15 @@ export class RexApp {
         }
         return
       }
-      // Miss — synthesize an error to flow through the same handler path.
-      throw missToError(match)
+      // Miss — but middleware that mounts a path-handler (e.g. `riftex.static()`)
+      // expects to run on requests that don't match a registered route. Build a
+      // fall-through chain from any global + mount-prefix-matching middleware
+      // and let it have a shot. If it writes the response, we're done; if it
+      // calls next() or doesn't write, we surface the original 404/405.
+      await this.runFallback(ctx, missToError(match))
+      if (hasHooks && hooks.hasOnResponse()) {
+        await hooks.runOnResponse(ctx)
+      }
     } catch (err) {
       // Observation hook fires BEFORE the error boundary writes a response.
       // The boundary still owns the actual response — these hooks cannot
@@ -252,7 +263,32 @@ export class RexApp {
     }
   }
 
-  private async handleError(err: unknown, ctx: RexContext): Promise<void> {
+  /**
+   * Run global + path-matching scoped middleware as a fallback chain when the
+   * trie has no matching route. The terminal handler re-throws the original
+   * trie miss so the error boundary still produces 404/405 if no middleware
+   * wrote the response. Composed per-request — misses are exceptional.
+   */
+  private async runFallback(ctx: RiftexContext, miss: RiftexError): Promise<void> {
+    const flat = this._flat
+    if (!flat) {
+      throw miss
+    }
+    const applicable: RiftexMiddleware[] = [...flat.globalMiddleware]
+    for (const scoped of flat.scopedMiddleware) {
+      if (pathStartsWith(ctx.path, scoped.prefix)) applicable.push(scoped.mw)
+    }
+    if (applicable.length === 0) {
+      throw miss
+    }
+    // No-op terminal — let middleware finish completely (including post-next
+    // hooks). If nothing wrote a response, surface the trie miss as a 404/405.
+    const chain = composeWithHandler(applicable, () => {})
+    await chain(ctx)
+    if (!ctx._written) throw miss
+  }
+
+  private async handleError(err: unknown, ctx: RiftexContext): Promise<void> {
     // Reset response state in case a partial helper had been called.
     if (this.errorHandler) {
       try {
@@ -279,14 +315,14 @@ export class RexApp {
   }
 }
 
-function missToError(miss: MatchMiss): RexError {
-  if (miss.kind === 'not-found') return new RexNotFoundError()
-  return new RexMethodNotAllowedError(miss.allowed)
+function missToError(miss: MatchMiss): RiftexError {
+  if (miss.kind === 'not-found') return new RiftexNotFoundError()
+  return new RiftexMethodNotAllowedError(miss.allowed)
 }
 
-function writeDefaultError(err: unknown, ctx: RexContext): void {
-  if (err instanceof RexError) {
-    if (err instanceof RexMethodNotAllowedError) {
+function writeDefaultError(err: unknown, ctx: RiftexContext): void {
+  if (err instanceof RiftexError) {
+    if (err instanceof RiftexMethodNotAllowedError) {
       ctx.set('allow', err.allowed.join(', '))
     }
     const payload: Record<string, unknown> = { error: err.message, code: err.code }
@@ -308,21 +344,21 @@ function pathStartsWith(path: string, prefix: string): boolean {
 }
 
 /**
- * Factory function. Mirrors the `express()` ergonomics — `rex(...)` returns
+ * Factory function. Mirrors the `express()` ergonomics — `riftex(...)` returns
  * a new app, and the function carries the body-parser middleware factories
  * plus a `Router` constructor as static properties.
  */
-export interface RexFactory {
-  (options?: RexAppOptions): RexApp
+export interface RiftexFactory {
+  (options?: RiftexAppOptions): RiftexApp
   Router: () => Router
 }
 
 /** Match: `void` for error-handler that delegates. (Used by the type tests.) */
-export type RexErrorReturn = unknown | Promise<unknown>
+export type RiftexErrorReturn = unknown | Promise<unknown>
 
 /** Function-with-properties factory created and exported by `index.ts`. */
-export function makeRexFactory(): RexFactory {
-  const fn = ((options?: RexAppOptions) => new RexApp(options)) as RexFactory
+export function makeRexFactory(): RiftexFactory {
+  const fn = ((options?: RiftexAppOptions) => new RiftexApp(options)) as RiftexFactory
   fn.Router = () => new Router()
   return fn
 }
