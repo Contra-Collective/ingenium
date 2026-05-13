@@ -20,6 +20,7 @@ import { EMPTY_PARAMS, RouterTrie, type MatchMiss } from './router/trie.ts'
 import type { HttpMethod } from './router/types.ts'
 import { NodeAdapter } from './transport/node.ts'
 import type { ListeningServer, Transport } from './transport/types.ts'
+import { descriptorKey, type RouteDescriptor } from './openapi/describe.ts'
 
 /** Options accepted by `riftex(...)` and `new RiftexApp(...)`. */
 export interface RiftexAppOptions {
@@ -57,6 +58,10 @@ export class RiftexApp {
   private errorHandler: RiftexErrorHandler | null = null
   private readonly _hooks: HooksRegistry = new HooksRegistry()
   private readonly _decorators: DecoratorRegistry = new DecoratorRegistry()
+  /** @internal Per-route OpenAPI metadata. Keyed by `${method} ${path}`. */
+  private readonly _routeDescriptors: Map<string, RouteDescriptor> = new Map()
+  /** @internal Bumped on every `describe()` call so the OpenAPI handler's cache invalidates. */
+  private _routeDescriptorVersion = 0
   /** @internal Carried onto each `RiftexContext` so its `ip`/`protocol`/`hostname` getters can resolve. */
   private readonly _trustProxy: import('./proxy/trust.ts').TrustProxy
 
@@ -146,6 +151,32 @@ export class RiftexApp {
     return this
   }
 
+  /**
+   * Attach OpenAPI metadata to a route. The route must be registered separately
+   * via `app.get/post/...`. Multiple calls overwrite the previous descriptor
+   * for the same `(method, path)` pair. Reads via `generateOpenApi(app)`.
+   */
+  describe(method: HttpMethod, path: string, meta: RouteDescriptor): this {
+    this._routeDescriptors.set(descriptorKey(method, path), meta)
+    this._routeDescriptorVersion++
+    return this
+  }
+
+  /** @internal Read-only view of route descriptors — used by the OpenAPI generator. */
+  get routeDescriptors(): ReadonlyMap<string, RouteDescriptor> {
+    return this._routeDescriptors
+  }
+
+  /** @internal Bumps on every `describe()` call so the OpenAPI handler can cache-bust. */
+  get routeDescriptorVersion(): number {
+    return this._routeDescriptorVersion
+  }
+
+  /** @internal Read-only view of the registration journal — used by the OpenAPI generator. */
+  get routerJournal(): Router {
+    return this.router
+  }
+
   // ───── Composition ───────────────────────────────────────────────────────
 
   /**
@@ -210,6 +241,11 @@ export class RiftexApp {
    */
   async handle(ctx: RiftexContext): Promise<void> {
     if (this.dirty) await this.composeAsync()
+
+    // Back-reference so app-aware handlers (e.g. openapiHandler) can reach
+    // the app from inside a route handler. ctx.state is reset per request
+    // by the pool, so this doesn't leak between requests.
+    ctx.state._riftexApp = this
 
     // Stamp trust-proxy config so ctx.ip/protocol/hostname resolve correctly.
     // Non-default values only (false is the reset baseline — skip the write).

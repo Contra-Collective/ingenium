@@ -4,6 +4,15 @@ import { Buffer } from 'node:buffer'
 import { RiftexBody } from './body.ts'
 import type { HttpMethod } from '../router/types.ts'
 import { resolveForwarded, type ForwardedInfo, type TrustProxy } from '../proxy/trust.ts'
+import {
+  accepts as acceptsFn,
+  acceptsCharsets as acceptsCharsetsFn,
+  acceptsLanguages as acceptsLanguagesFn,
+  acceptsEncodings as acceptsEncodingsFn,
+} from '../negotiation/negotiate.ts'
+import { formatResponse, type FormatHandlers } from '../negotiation/format.ts'
+import { isFresh } from '../negotiation/fresh.ts'
+import { respondJsonWithEtag, type JsonEtagOptions } from '../negotiation/json-etag.ts'
 
 /** Sentinel for routes with no params — frozen, so `ctx.params.foo` is safe. */
 const EMPTY_PARAMS = Object.freeze(Object.create(null) as Record<string, string>)
@@ -164,6 +173,83 @@ export class RiftexContext<Params = Record<string, string>> {
       this._body = { kind: 'buffer', data: body }
     }
     this._written = true
+  }
+
+  // ───── Content negotiation (request side) ──────────────────────────────
+
+  /**
+   * Return the best mime type the client accepts from the offered list, or
+   * `false` if none are acceptable. With no arguments, returns the parsed
+   * preference-ordered list of accepted types from `Accept`.
+   *
+   * Each `type` may be a shorthand (`'json'`, `'html'`, `'csv'`, …) or a full
+   * mime (`'application/json'`). Quality factors are honored.
+   *
+   * @example
+   *   if (ctx.accepts('json')) ctx.json({ ok: true })
+   *   else ctx.status(406).text('Not Acceptable')
+   */
+  accepts(): string[]
+  accepts(...types: string[]): string | false
+  accepts(...types: string[]): string | false | string[] {
+    return types.length === 0 ? acceptsFn(this) : acceptsFn(this, ...types)
+  }
+
+  /** Best matching charset from the offered list against `Accept-Charset`. */
+  acceptsCharsets(): string[]
+  acceptsCharsets(...charsets: string[]): string | false
+  acceptsCharsets(...charsets: string[]): string | false | string[] {
+    return charsets.length === 0 ? acceptsCharsetsFn(this) : acceptsCharsetsFn(this, ...charsets)
+  }
+
+  /** Best matching language against `Accept-Language` (exact-tag match only). */
+  acceptsLanguages(): string[]
+  acceptsLanguages(...langs: string[]): string | false
+  acceptsLanguages(...langs: string[]): string | false | string[] {
+    return langs.length === 0 ? acceptsLanguagesFn(this) : acceptsLanguagesFn(this, ...langs)
+  }
+
+  /** Best matching encoding against `Accept-Encoding` (first offered when header absent). */
+  acceptsEncodings(): string[]
+  acceptsEncodings(...encodings: string[]): string | false
+  acceptsEncodings(...encodings: string[]): string | false | string[] {
+    return encodings.length === 0 ? acceptsEncodingsFn(this) : acceptsEncodingsFn(this, ...encodings)
+  }
+
+  // ───── Content negotiation (response side) ─────────────────────────────
+
+  /**
+   * Run the handler whose key best matches the request `Accept` header. The
+   * matched key is set as `Content-Type`. If no key matches and no `default`
+   * handler is provided, throws `RiftexError(406, 'NOT_ACCEPTABLE')`.
+   */
+  format(handlers: FormatHandlers): Promise<void> {
+    return formatResponse(this, handlers)
+  }
+
+  /**
+   * `true` when the client's `If-None-Match` matches the response `ETag`,
+   * or `If-Modified-Since` is at-or-after the response `Last-Modified`.
+   * Reads from `_headers` so handlers can set ETag / Last-Modified before checking.
+   */
+  get fresh(): boolean {
+    return isFresh(
+      this.headers as Record<string, string | string[] | undefined>,
+      this._headers as Record<string, string | string[] | undefined>,
+    )
+  }
+
+  /** `!fresh`. */
+  get stale(): boolean {
+    return !this.fresh
+  }
+
+  /**
+   * Send a JSON body with an auto-computed weak ETag. If the request's
+   * `If-None-Match` matches the computed tag, short-circuits to 304.
+   */
+  jsonWithEtag(body: unknown, opts?: JsonEtagOptions): void {
+    respondJsonWithEtag(this, body, opts)
   }
 
   // ───── Pool lifecycle ──────────────────────────────────────────────────

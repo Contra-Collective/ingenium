@@ -11,6 +11,11 @@ import { corsMiddleware } from './cors/middleware.ts'
 import { sse } from './sse/sse.ts'
 import { rateLimit } from './rate-limit/middleware.ts'
 import { csrfMiddleware } from './csrf/middleware.ts'
+import { problemDetailsMiddleware } from './problem/middleware.ts'
+import { idempotencyMiddleware } from './idempotency/middleware.ts'
+import { jwtMiddleware } from './jwt/middleware.ts'
+import { apiKeyMiddleware } from './api-key/middleware.ts'
+import { openapiHandler } from './openapi/handler.ts'
 
 // ───── App + Router ────────────────────────────────────────────────────────
 export { RiftexApp, type RiftexAppOptions, type RiftexErrorHandler } from './app.ts'
@@ -88,6 +93,87 @@ export type { RateLimitOptions, RateLimitStore } from './rate-limit/types.ts'
 export { csrfMiddleware, RiftexCsrfError } from './csrf/middleware.ts'
 export type { CsrfOptions, CsrfStorage, CsrfCookieOptions, CsrfValueReader } from './csrf/types.ts'
 
+// ───── Content negotiation ─────────────────────────────────────────────────
+export {
+  parseAcceptHeader,
+  selectBest,
+  expandShorthand,
+  sortByPreference,
+  type ParsedAccept,
+} from './negotiation/accept.ts'
+export {
+  accepts,
+  acceptsCharsets,
+  acceptsLanguages,
+  acceptsEncodings,
+  type NegotiableCtx,
+} from './negotiation/negotiate.ts'
+export {
+  formatResponse,
+  type FormatHandlers,
+  type FormattableCtx,
+} from './negotiation/format.ts'
+export { isFresh, type HeaderBag } from './negotiation/fresh.ts'
+export { computeEtag } from './negotiation/etag.ts'
+export {
+  respondJsonWithEtag,
+  type JsonEtagOptions,
+  type JsonEtagCtx,
+} from './negotiation/json-etag.ts'
+
+// ───── RFC 7807 Problem Details middleware ─────────────────────────────────
+export { problemDetailsMiddleware } from './problem/middleware.ts'
+export { toProblemDetails } from './problem/serialize.ts'
+export type { ProblemDetails, ProblemDetailsOptions } from './problem/types.ts'
+
+// ───── Idempotency-Key middleware ──────────────────────────────────────────
+export { idempotencyMiddleware } from './idempotency/middleware.ts'
+export { IdempotencyMemoryStore } from './idempotency/store.ts'
+export type {
+  CachedResponse,
+  IdempotencyOptions,
+  IdempotencyStore,
+} from './idempotency/types.ts'
+
+// ───── JWT middleware ──────────────────────────────────────────────────────
+export { jwtMiddleware } from './jwt/middleware.ts'
+export { verifyJwt } from './jwt/verify.ts'
+export type {
+  JwtAlgorithm,
+  JwtHeader,
+  JwtOptions,
+  JwtSecret,
+  JwtSecretResolver,
+  JwtTokenReader,
+  JwtVerified,
+  JwtLogger,
+} from './jwt/types.ts'
+
+// ───── API-key middleware ──────────────────────────────────────────────────
+export { apiKeyMiddleware } from './api-key/middleware.ts'
+export type { ApiKeyOptions, ApiKeyValidator, ApiKeyLogger } from './api-key/types.ts'
+
+// ───── OpenAPI 3.1 spec generation ─────────────────────────────────────────
+export { generateOpenApi } from './openapi/generate.ts'
+export type { GenerateOpenApiOptions } from './openapi/generate.ts'
+export { openapiHandler } from './openapi/handler.ts'
+export type { RouteDescriptor } from './openapi/describe.ts'
+export type {
+  OpenApiSpec,
+  PathItem,
+  Operation,
+  Parameter,
+  RequestBody,
+  Response as OpenApiResponse,
+  Schema as OpenApiSchema,
+  Info as OpenApiInfo,
+  Server as OpenApiServer,
+  Tag as OpenApiTag,
+  Components as OpenApiComponents,
+  SecurityScheme as OpenApiSecurityScheme,
+  SecurityRequirement as OpenApiSecurityRequirement,
+} from './openapi/types.ts'
+
 // ───── Session middleware ──────────────────────────────────────────────────
 export { sessionMiddleware } from './session/middleware.ts'
 export { MemoryStore as SessionMemoryStore } from './session/store-memory.ts'
@@ -161,6 +247,11 @@ export const riftex = Object.assign(riftexCore, {
   csrf: csrfMiddleware,
   sse,
   rateLimit,
+  problemDetails: problemDetailsMiddleware,
+  idempotency: idempotencyMiddleware,
+  jwt: jwtMiddleware,
+  apiKey: apiKeyMiddleware,
+  openapiHandler,
 })
 
 export default riftex
