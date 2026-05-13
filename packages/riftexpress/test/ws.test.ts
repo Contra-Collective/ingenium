@@ -84,16 +84,28 @@ describe.skipIf(!hasWs)('riftexpress/ws', () => {
 
     const server = await app.listen(0)
     try {
-      const a = await connect(`ws://127.0.0.1:${server.port}/a`)
-      const b = await connect(`ws://127.0.0.1:${server.port}/b`)
+      // The handlers above push a message on upgrade — server-initiated.
+      // We MUST attach the 'message' listener at construction time, before
+      // the socket reaches OPEN, because `ws` (unlike browser WebSocket)
+      // does not buffer messages that arrive before a listener exists.
+      // Pattern: build the WebSocket, attach handlers synchronously, then
+      // wrap in a Promise that resolves on the first message.
+      const collect = (url: string): Promise<Buffer> =>
+        new Promise((resolve, reject) => {
+          const c = new WS.WebSocket(url)
+          c.on('message', (m: Buffer) => {
+            resolve(m)
+            c.close()
+          })
+          c.on('error', reject)
+        })
+
       const [aMsg, bMsg] = await Promise.all([
-        once<Buffer>(a, 'message'),
-        once<Buffer>(b, 'message'),
+        collect(`ws://127.0.0.1:${server.port}/a`),
+        collect(`ws://127.0.0.1:${server.port}/b`),
       ])
       expect(aMsg.toString()).toBe('A')
       expect(bMsg.toString()).toBe('B')
-      a.close()
-      b.close()
     } finally {
       await server.close({ gracefulTimeoutMs: 100 })
     }

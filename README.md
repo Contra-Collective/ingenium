@@ -513,6 +513,8 @@ Two storage modes:
 
 Verification uses `crypto.timingSafeEqual`. Secret rotation supported (`secret: ['new', 'old']`). Failures throw `RiftexCsrfError` (HTTP 403, code `CSRF_FAILED`) which the default error boundary serializes; catch in `app.onError` for custom handling.
 
+> **Sessioned apps should opt in to `storage: 'session'`.** The default is `'cookie'` because it's self-contained, but if you're already running `sessionMiddleware` the synchronizer pattern is simpler (one cookie instead of two, and rotating the session secret rotates CSRF protection automatically). We don't auto-detect because middleware order shouldn't change semantics. See [docs/api/csrf.md](docs/api/csrf.md#recommendation).
+
 ### `sessionMiddleware`
 
 ```ts

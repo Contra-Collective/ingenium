@@ -11,6 +11,19 @@ import type { CsrfOptions, CsrfStorage, CsrfCookieOptions, CsrfValueReader } fro
 
 ---
 
+## Recommendation
+
+- **No session middleware in your app?** Use the default `storage: 'cookie'` — that's what it's for. The signed double-submit pattern is self-contained and works fine for SPAs and pure-API services.
+- **Already running `sessionMiddleware`?** Prefer **`storage: 'session'`** explicitly. The token can ride alongside the session id (one cookie instead of two), the signature step is unnecessary (the session id already authenticates the binding), and rotating the session secret rotates the CSRF protection automatically.
+
+We deliberately do **not** auto-detect the presence of `sessionMiddleware`. Middleware order shouldn't change semantics, and the `storage` choice has security implications that should be explicit in your code.
+
+```ts
+// Sessioned app — opt in to session storage
+app.use(sessionMiddleware({ secret: process.env.SESSION_SECRET! }))
+app.use(riftex.csrf({ storage: 'session' }))
+```
+
 ## Storage modes
 
 ### `'cookie'` (default)
