@@ -149,6 +149,25 @@ export class RiftexApp {
   /** @internal Default queue-drain timeout used when the listener closes. */
   private readonly _queueDrainTimeoutMs: number
 
+  /**
+   * @internal Per-request dispatch booleans, recomputed at every `compose()`.
+   * Cached because their underlying `.hasAny()` / `.hasOnXxx()` calls walk
+   * arrays and we don't want to pay that on every request — the registries
+   * are frozen between composes.
+   *
+   * `_handleFast` is the hot-path closure: when ALL of these are off
+   * (`!_hasHooks && !_hasDecorators && !_hasTimeout && !_hasTrustProxy`)
+   * we route through a stripped dispatch that skips every conditional.
+   */
+  private _hasHooks = false
+  private _hasOnRequest = false
+  private _hasOnResponse = false
+  private _hasOnError = false
+  private _hasDecorators = false
+  private readonly _hasTimeout: boolean
+  private readonly _hasTrustProxy: boolean
+  private _useFastPath = false
+
   constructor(options: RiftexAppOptions = {}) {
     this.pool = new RiftexContextPool(options.poolSize ?? 1024)
     this.transport = options.transport ?? new NodeAdapter()
@@ -156,6 +175,9 @@ export class RiftexApp {
     this._requestTimeoutMs = options.requestTimeoutMs
     this._maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this._queueDrainTimeoutMs = options.queueDrainTimeoutMs ?? 10_000
+    // These two are stable for the lifetime of the app.
+    this._hasTimeout = options.requestTimeoutMs !== undefined
+    this._hasTrustProxy = (options.trustProxy ?? false) !== false
 
     // Wire `ctx.queue(name)` as a lazy decorator. Returns a per-call handle
     // that delegates straight to the registry. Lazy = zero overhead for
@@ -166,6 +188,33 @@ export class RiftexApp {
         return { add: (data: TData) => q.add(data) }
       }
     })
+  }
+
+  /**
+   * @internal Recompute the cached dispatch booleans. Called at the end of
+   * `compose()` (and `composeAsync()`) so per-request reads are O(1) field
+   * loads instead of `.hasAny()` array scans.
+   *
+   * The fast path is taken when an app uses zero opt-in features beyond the
+   * router itself: no plugins, no decorators, no request timeout, no
+   * trust-proxy. That's the typical "Sinatra-shape" / "Express-shape"
+   * register-routes-and-go app — the case we want to be the absolute fastest.
+   * Note `ctx.queue` registers a decorator at construction, so any app that
+   * uses background jobs is OFF the fast path. That's the correct semantics:
+   * if you want the queue ergonomic, you accept the per-request decorator
+   * apply cost.
+   */
+  private _recomputeDispatchFlags(): void {
+    this._hasHooks = this._hooks.hasAny()
+    this._hasOnRequest = this._hasHooks && this._hooks.hasOnRequest()
+    this._hasOnResponse = this._hasHooks && this._hooks.hasOnResponse()
+    this._hasOnError = this._hasHooks && this._hooks.hasOnError()
+    this._hasDecorators = this._decorators.hasAny()
+    this._useFastPath =
+      !this._hasHooks &&
+      !this._hasDecorators &&
+      !this._hasTimeout &&
+      !this._hasTrustProxy
   }
 
   // ───── Plugin system ────────────────────────────────────────────────────
@@ -596,6 +645,11 @@ export class RiftexApp {
     // idempotent — safe to run on every recompose triggered by the dirty bit.
     this._crons.startAll()
     this._queues.startAll()
+
+    // Cache dispatch booleans so handle() can branch on field reads instead
+    // of `.hasAny()` calls. Re-runs on every recompose because plugins can
+    // be `register()`'d after listen().
+    this._recomputeDispatchFlags()
   }
 
   /**
@@ -626,21 +680,40 @@ export class RiftexApp {
     // by the pool, so this doesn't leak between requests.
     ctx.state._riftexApp = this
 
-    // Stamp trust-proxy config so ctx.ip/protocol/hostname resolve correctly.
-    // Non-default values only (false is the reset baseline — skip the write).
-    if (this._trustProxy !== false) ctx._trustProxy = this._trustProxy
+    // ───── Fast path ─────────────────────────────────────────────────────
+    // Apps with no plugins, no decorators, no timeout, and no trust-proxy
+    // skip the entire branch ladder below. This is the typical Sinatra-shape
+    // app — register routes, listen, done. Bench impact: meaningfully better
+    // hello-rps because we don't pay for features the app doesn't use.
+    if (this._useFastPath) {
+      try {
+        const match = this.trie.find(ctx.method, ctx.path)
+        if ('handler' in match) {
+          if (match.params !== EMPTY_PARAMS) ctx.params = match.params as never
+          await match.handler(ctx)
+          return
+        }
+        await this.runFallback(ctx, missToError(match))
+      } catch (err) {
+        await this.handleError(err, ctx)
+      }
+      return
+    }
 
-    // Hot-path: skip plugin work entirely when nothing is registered.
+    // ───── Full path (plugins / decorators / timeout / trust-proxy on) ──
+    // Stamp trust-proxy config so ctx.ip/protocol/hostname resolve correctly.
+    if (this._hasTrustProxy) ctx._trustProxy = this._trustProxy
+
+    // All booleans below are pre-computed at compose() time — no per-request
+    // `.hasAny()` array scans. See `_recomputeDispatchFlags`.
     const hooks = this._hooks
     const decorators = this._decorators
-    const hasHooks = hooks.hasAny()
-    const hasDecorators = decorators.hasAny()
 
     try {
-      if (hasHooks && hooks.hasOnRequest()) {
+      if (this._hasOnRequest) {
         await hooks.runOnRequest(ctx)
       }
-      if (hasDecorators) {
+      if (this._hasDecorators) {
         decorators.applyTo(ctx)
       }
 
@@ -658,13 +731,13 @@ export class RiftexApp {
         // back to a normal HTTP response. See `withEpochGuard` for the
         // mechanism that prevents orphaned handlers from corrupting the
         // next request bound to this same pooled context instance.
-        if (this._requestTimeoutMs !== undefined) {
-          await withEpochGuard(ctx, this._requestTimeoutMs, () => match.handler(ctx))
+        if (this._hasTimeout) {
+          await withEpochGuard(ctx, this._requestTimeoutMs as number, () => match.handler(ctx))
         } else {
           await match.handler(ctx)
         }
 
-        if (hasHooks && hooks.hasOnResponse()) {
+        if (this._hasOnResponse) {
           await hooks.runOnResponse(ctx)
         }
         return
@@ -675,14 +748,14 @@ export class RiftexApp {
       // and let it have a shot. If it writes the response, we're done; if it
       // calls next() or doesn't write, we surface the original 404/405.
       await this.runFallback(ctx, missToError(match))
-      if (hasHooks && hooks.hasOnResponse()) {
+      if (this._hasOnResponse) {
         await hooks.runOnResponse(ctx)
       }
     } catch (err) {
       // Observation hook fires BEFORE the error boundary writes a response.
       // The boundary still owns the actual response — these hooks cannot
       // swallow or replace the error.
-      if (hasHooks && hooks.hasOnError()) {
+      if (this._hasOnError) {
         await hooks.runOnError(err, ctx)
       }
       await this.handleError(err, ctx)

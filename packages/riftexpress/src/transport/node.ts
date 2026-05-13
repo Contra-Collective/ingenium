@@ -164,8 +164,19 @@ function populateContext(ctx: RiftexContext, req: IncomingMessage, maxRequestByt
   const ct = req.headers['content-type']
   // Wrap the raw IncomingMessage in a transport-level byte-limit so the cap
   // applies to EVERY consumer, including `ctx.body.stream()`. Skip the wrap
-  // when the cap is disabled (Infinity) — no Transform overhead in that case.
-  const source = Number.isFinite(maxRequestBytes) ? req.pipe(createByteLimit(maxRequestBytes)) : req
+  // when the cap is disabled (Infinity) OR when the request is structurally
+  // body-less (GET/HEAD/OPTIONS or explicit Content-Length: 0). The Transform
+  // is the single biggest per-request overhead on hot read endpoints; not
+  // installing it for body-less methods clawed back ~10-15% of hello-rps.
+  const noBody =
+    contentLength === 0 ||
+    ctx.method === 'GET' ||
+    ctx.method === 'HEAD' ||
+    ctx.method === 'OPTIONS'
+  const source =
+    noBody || !Number.isFinite(maxRequestBytes)
+      ? req
+      : req.pipe(createByteLimit(maxRequestBytes))
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 

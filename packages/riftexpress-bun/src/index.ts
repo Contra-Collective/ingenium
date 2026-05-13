@@ -153,7 +153,16 @@ function populateContext(ctx: RiftexContext, req: Request, maxRequestBytes: numb
   const cl = headers['content-length']
   const contentLength = cl ? Number(cl) : undefined
   const ct = headers['content-type']
-  let source = req.body ? webStreamToNodeReadable(req.body) : null
+  // Skip body wiring entirely for body-less methods even when req.body is
+  // a non-null empty stream — saves the WinterCG-to-node bridge AND the
+  // byte-limit Transform on every GET/HEAD/OPTIONS / Content-Length: 0
+  // request. Dominant case on read-heavy APIs.
+  const noBody =
+    contentLength === 0 ||
+    ctx.method === 'GET' ||
+    ctx.method === 'HEAD' ||
+    ctx.method === 'OPTIONS'
+  let source = noBody || !req.body ? null : webStreamToNodeReadable(req.body)
   if (source && Number.isFinite(maxRequestBytes)) {
     source = source.pipe(createByteLimit(maxRequestBytes))
   }

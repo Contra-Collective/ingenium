@@ -69,8 +69,19 @@ export function populateFromH2(
 
   // The `ServerHttp2Stream` IS a Duplex with a Readable side — wrap it in the
   // byte-limit Transform so the cap applies to EVERY consumer, including
-  // `ctx.body.stream()`. Skip the wrap when the cap is disabled (Infinity).
-  const source = Number.isFinite(maxRequestBytes) ? stream.pipe(createByteLimit(maxRequestBytes)) : stream
+  // `ctx.body.stream()`. Skip the wrap when the cap is disabled (Infinity)
+  // OR when the request is structurally body-less (GET/HEAD/OPTIONS or
+  // explicit Content-Length: 0). Saves a Transform+pipe per body-less
+  // request — the dominant case on read-heavy APIs.
+  const noBody =
+    contentLength === 0 ||
+    ctx.method === 'GET' ||
+    ctx.method === 'HEAD' ||
+    ctx.method === 'OPTIONS'
+  const source =
+    noBody || !Number.isFinite(maxRequestBytes)
+      ? stream
+      : stream.pipe(createByteLimit(maxRequestBytes))
   ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
