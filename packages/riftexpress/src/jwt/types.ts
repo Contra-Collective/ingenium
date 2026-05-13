@@ -1,11 +1,23 @@
+import type { KeyObject } from 'node:crypto'
+import type { Buffer } from 'node:buffer'
 import type { RiftexContext } from '../context/context.ts'
 
 /**
- * Supported JWT signing algorithms in v0.0.1. Only HMAC variants are wired
- * up — RS\* / ES\* require asymmetric key handling that is intentionally out of
- * scope for this release. Asking for them at construction throws.
+ * Supported JWT signing algorithms.
+ *
+ * - `HSxxx` — HMAC with the supplied shared secret.
+ * - `RSxxx` — RSASSA-PKCS1-v1_5 with the supplied RSA public key (PEM / JWK / KeyObject).
+ * - `PSxxx` — RSASSA-PSS (MGF1, salt length = digest length).
+ * - `ESxxx` — ECDSA on P-256 / P-384 / P-521 (raw r||s, NOT DER — per the JWT spec).
+ *
+ * `alg: 'none'` is intentionally absent from this union and is hard-rejected
+ * at the verifier — never accept unsigned tokens, even with an empty allowlist.
  */
-export type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512'
+export type JwtAlgorithm =
+  | 'HS256' | 'HS384' | 'HS512'
+  | 'RS256' | 'RS384' | 'RS512'
+  | 'ES256' | 'ES384' | 'ES512'
+  | 'PS256' | 'PS384' | 'PS512'
 
 /** Decoded JWT header. The `alg` field is required by the spec. */
 export interface JwtHeader {
@@ -36,16 +48,36 @@ export type JwtVerifyError =
   | { error: 'too_old' }
   | { error: 'aud_mismatch' }
   | { error: 'iss_mismatch' }
+  | { error: 'kid_unknown' }
+  | { error: 'jwks_fetch_failed' }
 
 /**
- * Resolve a per-request signing secret. Receives the decoded JWT header so
- * callers can implement `kid`-based JWKS-style routing without parsing the
- * token themselves.
+ * A single signing/verification key. For HMAC algorithms (HSxxx) this is the
+ * shared secret as a string; for asymmetric algorithms it's the PUBLIC key in
+ * PEM (string / Buffer) or as a pre-built `KeyObject`.
+ *
+ * Wrapping with `{ kid, key }` enables header-based key selection — the
+ * verifier picks the entry whose `kid` matches `header.kid`.
  */
-export type JwtSecretResolver = (header: JwtHeader) => string | Promise<string>
+export type JwtKey =
+  | string
+  | Buffer
+  | KeyObject
+  | { kid: string; key: string | Buffer | KeyObject }
+
+/**
+ * Resolve a per-request key. Receives the decoded JWT header so callers can
+ * implement `kid`-based JWKS-style routing without parsing the token themselves.
+ */
+export type JwtSecretResolver<_T = Record<string, unknown>> = (
+  header: JwtHeader,
+) => JwtKey | Promise<JwtKey>
 
 /** All ways `secret` can be supplied. */
-export type JwtSecret = string | string[] | JwtSecretResolver
+export type JwtSecret<T = Record<string, unknown>> =
+  | JwtKey
+  | JwtKey[]
+  | JwtSecretResolver<T>
 
 /** Signature for pulling the raw compact-serialization out of the request. */
 export type JwtTokenReader = (
@@ -57,12 +89,14 @@ export type JwtLogger = (event: { reason: string; alg?: string }) => void
 
 export interface JwtOptions<T = Record<string, unknown>> {
   /**
-   * HMAC secret. Accepts:
-   * - A single string.
-   * - An array of strings (rotation — each is tried in order).
-   * - A function `(header) => secret | Promise<secret>` for kid-based lookup.
+   * Verification key material. Accepts:
+   * - A single key (string secret, PEM, Buffer, or `KeyObject`).
+   * - `{ kid, key }` for explicit key-id tagging.
+   * - An array of any of the above (rotation / multi-key — the verifier
+   *   picks by `kid` if present, else tries each in order).
+   * - A function `(header) => key | Promise<key>` for fully custom routing.
    */
-  secret: JwtSecret
+  secret: JwtSecret<T>
   /** Allowed signing algorithms. Default `['HS256']`. */
   algorithms?: readonly JwtAlgorithm[]
   /** Required `aud` claim. Token's `aud` must match (or include) one of these. */
@@ -89,6 +123,15 @@ export interface JwtOptions<T = Record<string, unknown>> {
    * be an oracle for attackers).
    */
   logger?: JwtLogger
+  /**
+   * Optional JWKS endpoint URL. When set, the middleware fetches the keys
+   * from this URL on demand and looks them up by `header.kid`. Cached for
+   * `jwksCacheMs` (default 10 minutes) per URL with a single in-flight
+   * request coalesced across concurrent callers.
+   */
+  jwksUrl?: string
+  /** JWKS cache TTL in milliseconds. Default `600_000` (10 minutes). */
+  jwksCacheMs?: number
   /** Phantom — narrows `ctx.jwt.payload` for typed handlers. */
   _payload?: T
 }

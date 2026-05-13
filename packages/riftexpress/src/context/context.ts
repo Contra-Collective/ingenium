@@ -13,6 +13,81 @@ import {
 import { formatResponse, type FormatHandlers } from '../negotiation/format.ts'
 import { isFresh } from '../negotiation/fresh.ts'
 import { respondJsonWithEtag, type JsonEtagOptions } from '../negotiation/json-etag.ts'
+import { RiftexHeaderInjectionError, RiftexUnserializableError } from '../errors.ts'
+
+/** CR/LF detector for header-injection guard. Tested against names + values. */
+const CRLF_RE = /[\r\n]/
+
+/**
+ * Reject header NAMES containing CR or LF. Empty/undefined names are
+ * allowed through — the underlying header bag's own type system rejects
+ * those naturally.
+ */
+function assertHeaderNameSafe(name: string): void {
+  if (CRLF_RE.test(name)) {
+    throw new RiftexHeaderInjectionError(
+      `Header name contains CR/LF (possible header injection): ${JSON.stringify(name)}`,
+    )
+  }
+}
+
+/**
+ * Reject header VALUES containing CR or LF. Accepts a single string or an
+ * array — the array form checks each element. `undefined` is allowed (some
+ * call sites pass through optionals); empty string is allowed (legitimate).
+ */
+function assertHeaderValueSafe(name: string, value: string | string[]): void {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const v = value[i]
+      if (typeof v === 'string' && CRLF_RE.test(v)) {
+        throw new RiftexHeaderInjectionError(
+          `Header value contains CR/LF (possible header injection): ${name}[${i}]`,
+        )
+      }
+    }
+    return
+  }
+  if (typeof value === 'string' && CRLF_RE.test(value)) {
+    throw new RiftexHeaderInjectionError(
+      `Header value contains CR/LF (possible header injection): ${name}`,
+    )
+  }
+}
+
+/**
+ * Strict `JSON.stringify` wrapper used by the response helpers. Surfaces
+ * `BigInt` / circular / other serialization failures as a
+ * `RiftexUnserializableError` so the framework error boundary can render
+ * a clean 500 instead of a deep `TypeError` from V8.
+ */
+function strictStringify(body: unknown): string {
+  try {
+    return JSON.stringify(body) as string
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    let reason: string
+    if (/circular/i.test(msg)) {
+      reason = `circular structure (${msg})`
+    } else if (/BigInt/i.test(msg)) {
+      reason = `BigInt value (${msg})`
+    } else {
+      reason = msg
+    }
+    try {
+      process.emitWarning(
+        `RiftexUnserializableError: ${reason}`,
+        { type: 'RiftexUnserializableError' },
+      )
+    } catch {
+      // process.emitWarning can throw in unusual runtimes (workers); swallow.
+    }
+    throw new RiftexUnserializableError(
+      `Response body cannot be serialized: ${reason}`,
+      err,
+    )
+  }
+}
 
 /** Sentinel for routes with no params — frozen, so `ctx.params.foo` is safe. */
 const EMPTY_PARAMS = Object.freeze(Object.create(null) as Record<string, string>)
@@ -100,6 +175,26 @@ export class RiftexContext<Params = Record<string, string>> {
   /** @internal Whether a response helper has been called. */
   _written = false
 
+  /**
+   * @internal Per-request generation counter. Incremented every time the
+   * pool resets this context (and also bumped by `RiftexApp.handle` when a
+   * request times out, so writes from the orphaned handler can be detected
+   * as stale). Compared against `_dispatchEpoch` by every response writer.
+   */
+  _epoch = 0
+
+  /**
+   * @internal Last `_epoch` value captured by `RiftexApp.withEpochGuard`.
+   * Set on dispatch entry; the per-dispatch wrappers installed around the
+   * response writers close over this value to detect late writes from an
+   * orphaned (timed-out) handler. The wrappers compare `_epoch` against
+   * the captured value at call time — mismatch ⇒ orphan ⇒ swallow.
+   *
+   * `0` means no guard is active (no `requestTimeoutMs` configured, or
+   * the dispatch already resolved naturally).
+   */
+  _dispatchEpoch = 0
+
   // ───── Response helpers ────────────────────────────────────────────────
 
   /** Set the HTTP status code. Returns `this` for chaining. */
@@ -108,8 +203,16 @@ export class RiftexContext<Params = Record<string, string>> {
     return this
   }
 
-  /** Set a response header (case-insensitive). Returns `this` for chaining. */
+  /**
+   * Set a response header (case-insensitive). Returns `this` for chaining.
+   *
+   * Throws `RiftexHeaderInjectionError` if `name` or `value` contains CR
+   * or LF — these would otherwise enable header-injection / response-
+   * splitting attacks if a caller forwards untrusted user input directly.
+   */
   set(name: string, value: string | string[]): this {
+    assertHeaderNameSafe(name)
+    assertHeaderValueSafe(name, value)
     this._headers[name.toLowerCase()] = value
     return this
   }
@@ -123,11 +226,18 @@ export class RiftexContext<Params = Record<string, string>> {
     return this._headers[name.toLowerCase()]
   }
 
-  /** Send a JSON response. */
+  /**
+   * Send a JSON response.
+   *
+   * Throws `RiftexUnserializableError` if `body` cannot be encoded
+   * (circular structure, `BigInt`, etc.) — surfaces a clean 500 from the
+   * framework error boundary instead of a deep `TypeError`.
+   */
   json(body: unknown, status?: number): void {
+    const data = strictStringify(body)
     if (status !== undefined) this._statusCode = status
     if (!this._headers['content-type']) this._headers['content-type'] = 'application/json; charset=utf-8'
-    this._body = { kind: 'string', data: JSON.stringify(body) }
+    this._body = { kind: 'string', data }
     this._written = true
   }
 
@@ -276,6 +386,8 @@ export class RiftexContext<Params = Record<string, string>> {
     this._headers = Object.create(null) as Record<string, string | string[]>
     this._body = { kind: 'none' }
     this._written = false
+    this._dispatchEpoch = 0
+    this._epoch++
     this.body._reset()
   }
 }

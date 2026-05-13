@@ -11,7 +11,11 @@ const SECRET = 'test-secret-1'
 
 // ───── Helpers ──────────────────────────────────────────────────────────────
 
-const ALG_DIGEST: Record<JwtAlgorithm, string> = {
+// Only the HMAC subset is tested by the symmetric-token helper; asymmetric
+// algorithms (RS*/PS*/ES*) are exercised by jwt-asymmetric.test.ts. We use
+// a Partial map so this fixture doesn't need to enumerate every algorithm
+// the union now supports.
+const ALG_DIGEST: Partial<Record<JwtAlgorithm, string>> = {
   HS256: 'sha256',
   HS384: 'sha384',
   HS512: 'sha512',
@@ -33,7 +37,9 @@ function signTestJwt(
   const headerB64 = b64url(JSON.stringify(header))
   const payloadB64 = b64url(JSON.stringify(payload))
   const signingInput = `${headerB64}.${payloadB64}`
-  const sig = createHmac(ALG_DIGEST[alg], secret).update(signingInput).digest('base64url')
+  const digest = ALG_DIGEST[alg]
+  if (!digest) throw new Error(`signTestJwt: HMAC-only helper, got ${alg}`)
+  const sig = createHmac(digest, secret).update(signingInput).digest('base64url')
   return `${signingInput}.${sig}`
 }
 
@@ -234,8 +240,22 @@ describe('jwtMiddleware', () => {
 
   it('throws at construction time when an unsupported algorithm is requested', () => {
     expect(() =>
-      jwtMiddleware({ secret: SECRET, algorithms: ['RS256' as unknown as JwtAlgorithm] }),
-    ).toThrow(/RS256 not supported in v0\.0\.1/)
+      jwtMiddleware({ secret: SECRET, algorithms: ['HS999' as unknown as JwtAlgorithm] }),
+    ).toThrow(/unsupported algorithm/i)
+  })
+
+  it('rejects `alg: "none"` even if the allowlist is bypassed', async () => {
+    // Hand-craft a "none" token: header { alg: 'none' }, payload, empty sig.
+    const headerB64 = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }))
+    const payloadB64 = b64url(JSON.stringify({ sub: 'attacker' }))
+    const noneToken = `${headerB64}.${payloadB64}.`
+    const mw = jwtMiddleware({ secret: SECRET, logger: () => {} })
+    const c = ctxWith({ authorization: `Bearer ${noneToken}` })
+    await expect(mw(c, next)).rejects.toBeInstanceOf(RiftexUnauthorizedError)
+    // And construction-time: 'none' in the allowlist is forbidden too.
+    expect(() =>
+      jwtMiddleware({ secret: SECRET, algorithms: ['none' as unknown as JwtAlgorithm] }),
+    ).toThrow(/none/i)
   })
 
   it('does not leak which check failed in the error message', async () => {

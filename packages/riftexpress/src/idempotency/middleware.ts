@@ -11,6 +11,12 @@ import type {
 
 const DEFAULT_METHODS: readonly HttpMethod[] = ['POST', 'PATCH', 'DELETE']
 
+/**
+ * Default cacheable predicate: cache 2xx/3xx/4xx, NOT 5xx. Stripe
+ * convention — a transient 500 must not be replayed forever.
+ */
+const DEFAULT_CACHEABLE = (status: number): boolean => status >= 200 && status < 500
+
 /** Authorization-header-derived scope; falls back to `'anon'`. */
 function defaultScope(ctx: RiftexContext): string {
   const auth = ctx.headers['authorization']
@@ -118,6 +124,7 @@ export function idempotencyMiddleware(opts: IdempotencyOptions = {}): RiftexMidd
     ttlMs: (opts.ttlSeconds ?? 86_400) * 1000,
     scope: opts.scope ?? defaultScope,
     methodSet: new Set(opts.methods ?? DEFAULT_METHODS),
+    cacheable: opts.cacheable ?? DEFAULT_CACHEABLE,
   }
 
   if (resolved.ttlMs <= 0) {
@@ -168,10 +175,16 @@ export function idempotencyMiddleware(opts: IdempotencyOptions = {}): RiftexMidd
     try {
       await next()
       const captured = snapshot(ctx)
-      if (captured) {
+      // Honor the `cacheable` predicate — by default 5xx is NOT cached so a
+      // transient failure can't poison the key for the entire TTL. When
+      // skipped, resolve the in-flight promise with `null` so any waiter
+      // re-runs the handler instead of replaying a stale failure.
+      if (captured && resolved.cacheable(captured.statusCode)) {
         await resolved.store.set(cacheKey, captured, resolved.ttlMs)
+        resolveInflight(captured)
+      } else {
+        resolveInflight(null)
       }
-      resolveInflight(captured)
     } catch (err) {
       // Don't cache failures — clear the in-flight slot so retries can run
       // the handler fresh, and let the error propagate.

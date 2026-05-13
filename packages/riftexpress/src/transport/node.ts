@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { Socket } from 'node:net'
 import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
+import { createByteLimit } from '../body/limit.ts'
 import type { CloseOptions, ListeningServer, Transport, TransportHooks } from './types.ts'
 
 /**
@@ -85,9 +86,21 @@ export class NodeAdapter implements Transport {
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, hooks: TransportHooks): Promise<void> {
+  // Normalize once: TransportHooks types maxRequestBytes as optional for
+  // backward-compat; framework dispatch always sets it. Older fixtures may
+  // not — treat undefined as "no cap" (Infinity).
+  const maxBytes = hooks.maxRequestBytes ?? Number.POSITIVE_INFINITY
+
+  // Content-Length pre-check: if the client declares a body larger than the
+  // ceiling, reject IMMEDIATELY without acquiring a context or buffering
+  // anything. Chunked requests (no Content-Length) and Content-Length: 0
+  // fall through to the byte-limit Transform below, which catches
+  // mid-stream overruns.
+  if (rejectIfContentLengthTooBig(req, res, maxBytes)) return
+
   const ctx = hooks.acquire()
   try {
-    populateContext(ctx, req)
+    populateContext(ctx, req, maxBytes)
     await hooks.dispatch(ctx)
     writeResponse(ctx, res)
   } finally {
@@ -95,7 +108,39 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, hooks: T
   }
 }
 
-function populateContext(ctx: RiftexContext, req: IncomingMessage): void {
+/**
+ * Returns `true` (and writes a 413 response) if the request advertises a
+ * Content-Length greater than `maxRequestBytes`. Returns `false` for missing,
+ * invalid, or in-range Content-Length values — those cases are handled by
+ * the byte-limit Transform downstream.
+ */
+function rejectIfContentLengthTooBig(
+  req: IncomingMessage,
+  res: ServerResponse,
+  maxRequestBytes: number,
+): boolean {
+  if (!Number.isFinite(maxRequestBytes)) return false
+  const raw = req.headers['content-length']
+  if (typeof raw !== 'string' || raw.length === 0) return false
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return false
+  if (n <= maxRequestBytes) return false
+
+  res.statusCode = 413
+  res.setHeader('content-type', 'application/json; charset=utf-8')
+  res.setHeader('connection', 'close')
+  res.end(
+    JSON.stringify({
+      error: `Request body exceeded ${maxRequestBytes} bytes`,
+      code: 'PAYLOAD_TOO_LARGE',
+    }),
+  )
+  // Hint the kernel to drop any pending body bytes; we never read them.
+  req.socket?.destroy()
+  return true
+}
+
+function populateContext(ctx: RiftexContext, req: IncomingMessage, maxRequestBytes: number): void {
   ctx.method = (req.method ?? 'GET') as HttpMethod
   ctx.url = req.url ?? '/'
   // Split path / query without allocating a URL object.
@@ -117,7 +162,11 @@ function populateContext(ctx: RiftexContext, req: IncomingMessage): void {
   const cl = req.headers['content-length']
   const contentLength = cl ? Number(cl) : undefined
   const ct = req.headers['content-type']
-  ctx.body._attach(req, ct, Number.isFinite(contentLength) ? contentLength : undefined)
+  // Wrap the raw IncomingMessage in a transport-level byte-limit so the cap
+  // applies to EVERY consumer, including `ctx.body.stream()`. Skip the wrap
+  // when the cap is disabled (Infinity) — no Transform overhead in that case.
+  const source = Number.isFinite(maxRequestBytes) ? req.pipe(createByteLimit(maxRequestBytes)) : req
+  ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 }
 
 function writeResponse(ctx: RiftexContext, res: ServerResponse): void {

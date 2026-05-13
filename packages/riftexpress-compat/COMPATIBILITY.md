@@ -29,6 +29,46 @@ verified end-to-end against `packages/riftexpress-compat/test/e2e.test.ts`.
 | `express-session`     | Unsupported | Monkey-patches `res.end` to persist the session and emit `Set-Cookie` lazily. The shim's `end` is a sync one-shot; the patched flush never runs and `Set-Cookie` is never written. **Workaround:** use `sessionMiddleware` from `riftexpress`. |
 | `multer`              | Unsupported | Calls `req.pipe(busboy)`; the req-shim is not a Readable. Throws `TypeError: req.pipe is not a function` → 500. **Workaround:** use `await ctx.body.multipart()`. |
 
+## What happens now (detect-and-throw guard)
+
+As of the latest `riftexpress-compat` release, `expressCompat()` runs a
+**cheap, one-time detection pass at registration** against the known-broken
+set above. If you wrap one of these middlewares, `expressCompat()` will
+**throw a `TypeError` immediately** — not at request time, not silently —
+naming the package and the RiftExpress-native equivalent you should use.
+
+Example:
+
+```ts
+app.use(expressCompat(bodyParser.json()))
+// → TypeError: expressCompat(): refusing to wrap `body-parser`'s jsonParser
+//   — it consumes the request stream via req.on('data')/req.on('end'), which
+//   the shim cannot proxy and would hang forever. Use RiftExpress's native
+//   equivalent instead: `await ctx.body.json()`. See
+//   packages/riftexpress-compat/COMPATIBILITY.md for the full matrix.
+```
+
+**Detection mechanism:** the wrapped function's `.name` is matched against
+an allow-list (`jsonParser`, `urlencodedParser`, `textParser`, `rawParser`,
+`multerMiddleware`, `session`, `compression`). It is intentionally
+conservative — obfuscated, renamed, or user-rewrapped middleware will pass
+through silently rather than risk a false positive.
+
+### Opt-out
+
+If you have a specific reason to run a known-broken middleware anyway
+(experimentation, a custom fork that fixed the underlying issue, etc.),
+pass the opt-out flag:
+
+```ts
+app.use(expressCompat(bodyParser.json(), { allowKnownBroken: true }))
+```
+
+This downgrades the throw to a `process.emitWarning(...)` with the
+`RiftexCompatKnownBroken` warning name, and returns a working wrapping
+middleware. The underlying compatibility problem is unchanged — the
+middleware will still no-op / hang / crash as documented above.
+
 ## Why the unsupported set fails
 
 Three architectural mismatches account for every failure on this list:

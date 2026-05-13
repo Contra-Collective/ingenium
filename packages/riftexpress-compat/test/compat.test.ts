@@ -84,3 +84,126 @@ describe('expressCompat', () => {
     expect(ctx.state['user']).toEqual({ id: 7 })
   })
 })
+
+describe('expressCompat — known-broken detection', () => {
+  // We don't want to take real runtime deps on body-parser/multer/express-session/
+  // compression in this unit suite (the e2e suite already covers their behavior).
+  // The detection mechanism is purely `mw.name`, so we fabricate look-alike
+  // functions whose `.name` matches what each package's factory produces.
+  const named = <T extends (...a: never[]) => unknown>(name: string, fn: T): T => {
+    Object.defineProperty(fn, 'name', { value: name, configurable: true })
+    return fn
+  }
+
+  const fakeBodyParserJson = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('jsonParser', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeBodyParserUrlencoded = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('urlencodedParser', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeBodyParserText = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('textParser', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeBodyParserRaw = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('rawParser', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeMulter = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('multerMiddleware', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeSession = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('session', (_req: unknown, _res: unknown, next: () => void): void => next())
+  const fakeCompression = (): ((req: unknown, res: unknown, next: () => void) => void) =>
+    named('compression', (_req: unknown, _res: unknown, next: () => void): void => next())
+
+  it('throws on body-parser jsonParser with the native equivalent in the message', () => {
+    expect(() => expressCompat(fakeBodyParserJson())).toThrow(TypeError)
+    expect(() => expressCompat(fakeBodyParserJson())).toThrow(/await ctx\.body\.json\(\)/)
+    expect(() => expressCompat(fakeBodyParserJson())).toThrow(/body-parser/)
+  })
+
+  it('throws on body-parser urlencoded/text/raw with their respective native equivalents', () => {
+    expect(() => expressCompat(fakeBodyParserUrlencoded())).toThrow(/await ctx\.body\.urlencoded\(\)/)
+    expect(() => expressCompat(fakeBodyParserText())).toThrow(/await ctx\.body\.text\(\)/)
+    expect(() => expressCompat(fakeBodyParserRaw())).toThrow(/await ctx\.body\.buffer\(\)/)
+  })
+
+  it('throws on multer with the multipart native equivalent', () => {
+    expect(() => expressCompat(fakeMulter())).toThrow(TypeError)
+    expect(() => expressCompat(fakeMulter())).toThrow(/await ctx\.body\.multipart\(\)/)
+    expect(() => expressCompat(fakeMulter())).toThrow(/multer/)
+  })
+
+  it('throws on express-session pointing at sessionMiddleware', () => {
+    expect(() => expressCompat(fakeSession())).toThrow(TypeError)
+    expect(() => expressCompat(fakeSession())).toThrow(/sessionMiddleware/)
+    expect(() => expressCompat(fakeSession())).toThrow(/express-session/)
+  })
+
+  it('throws on compression pointing at the reverse proxy', () => {
+    expect(() => expressCompat(fakeCompression())).toThrow(TypeError)
+    expect(() => expressCompat(fakeCompression())).toThrow(/reverse proxy/)
+  })
+
+  it('does NOT throw on cors() (known-good middleware)', () => {
+    expect(() => expressCompat(cors())).not.toThrow()
+  })
+
+  it('does NOT throw on a user middleware whose name does not match the broken list', () => {
+    const unknownFn = (_req: unknown, _res: unknown, next: () => void): void => next()
+    expect(() => expressCompat(unknownFn)).not.toThrow()
+    // Anonymous arrow functions have a name like '' or the variable name, both fine.
+    const anon = ((): ((req: unknown, res: unknown, next: () => void) => void) => {
+      return (_req, _res, next): void => next()
+    })()
+    expect(() => expressCompat(anon)).not.toThrow()
+  })
+
+  it('does NOT throw a false positive on a user fn that happens to be named "json"', () => {
+    // Only EXACT matches against the broken table count. `json` is not `jsonParser`.
+    const json = named('json', (_req: unknown, _res: unknown, next: () => void): void => next())
+    expect(() => expressCompat(json)).not.toThrow()
+  })
+
+  it('opt-out: { allowKnownBroken: true } emits a warning instead of throwing', () => {
+    const warnings: { msg: string; name: string }[] = []
+    const onWarn = (w: Error): void => {
+      warnings.push({ msg: w.message, name: w.name })
+    }
+    process.on('warning', onWarn)
+    try {
+      expect(() => expressCompat(fakeBodyParserJson(), { allowKnownBroken: true })).not.toThrow()
+      expect(() => expressCompat(fakeMulter(), { allowKnownBroken: true })).not.toThrow()
+      expect(() => expressCompat(fakeSession(), { allowKnownBroken: true })).not.toThrow()
+      expect(() => expressCompat(fakeCompression(), { allowKnownBroken: true })).not.toThrow()
+    } finally {
+      process.off('warning', onWarn)
+    }
+    // process.emitWarning fires asynchronously on nextTick; flush.
+    return new Promise<void>((resolve) => {
+      setImmediate(() => {
+        expect(warnings.length).toBeGreaterThanOrEqual(4)
+        expect(warnings.every((w) => w.name === 'RiftexCompatKnownBroken')).toBe(true)
+        expect(warnings.some((w) => /body-parser/.test(w.msg))).toBe(true)
+        expect(warnings.some((w) => /multer/.test(w.msg))).toBe(true)
+        expect(warnings.some((w) => /express-session/.test(w.msg))).toBe(true)
+        expect(warnings.some((w) => /reverse proxy/.test(w.msg))).toBe(true)
+        resolve()
+      })
+    })
+  })
+
+  it('opt-out: returns a working RiftexMiddleware (warning path does not short-circuit)', async () => {
+    // Silence the warning for this test only.
+    const swallow = (): void => {}
+    process.on('warning', swallow)
+    try {
+      const wrapped = expressCompat(
+        named('jsonParser', (_req: unknown, _res: unknown, next: (err?: unknown) => void): void => next()),
+        { allowKnownBroken: true },
+      )
+      let downstreamRan = false
+      const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+      await wrapped(ctx, async () => {
+        downstreamRan = true
+      })
+      expect(downstreamRan).toBe(true)
+    } finally {
+      process.off('warning', swallow)
+    }
+  })
+})

@@ -3,6 +3,7 @@ import { constants as h2 } from 'node:http2'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { RiftexContext } from '../context/context.ts'
 import type { HttpMethod } from '../router/types.ts'
+import { createByteLimit } from '../body/limit.ts'
 
 /**
  * HTTP/2 pseudo-headers (RFC 7540 §8.1.2.1). These appear as keys on the
@@ -34,6 +35,7 @@ export function populateFromH2(
   ctx: RiftexContext,
   stream: ServerHttp2Stream,
   headers: Http2IncomingHeaders,
+  maxRequestBytes: number,
 ): void {
   const rawMethod = headers[h2.HTTP2_HEADER_METHOD]
   ctx.method = (typeof rawMethod === 'string' ? rawMethod.toUpperCase() : 'GET') as HttpMethod
@@ -65,9 +67,53 @@ export function populateFromH2(
   const contentLength = typeof cl === 'string' ? Number(cl) : undefined
   const ct = typeof userHeaders['content-type'] === 'string' ? (userHeaders['content-type'] as string) : undefined
 
-  // The `ServerHttp2Stream` IS a Duplex with a Readable side — `RiftexBody` only
-  // reads from it (via the byte-limit Transform), which works identically.
-  ctx.body._attach(stream, ct, Number.isFinite(contentLength) ? contentLength : undefined)
+  // The `ServerHttp2Stream` IS a Duplex with a Readable side — wrap it in the
+  // byte-limit Transform so the cap applies to EVERY consumer, including
+  // `ctx.body.stream()`. Skip the wrap when the cap is disabled (Infinity).
+  const source = Number.isFinite(maxRequestBytes) ? stream.pipe(createByteLimit(maxRequestBytes)) : stream
+  ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
+}
+
+/**
+ * Returns `true` (and writes a 413 response) if the inbound h2 stream's
+ * Content-Length exceeds the cap. Mirrors the Node adapter pre-check —
+ * called BEFORE `populateFromH2` so we don't even acquire a context for
+ * a request we're going to reject. Missing / invalid Content-Length →
+ * `false` (chunked-style framing, where the byte-limit catches the overrun).
+ */
+export function rejectH2IfContentLengthTooBig(
+  stream: ServerHttp2Stream,
+  headers: Http2IncomingHeaders,
+  maxRequestBytes: number,
+): boolean {
+  if (!Number.isFinite(maxRequestBytes)) return false
+  const raw = headers['content-length']
+  const cl = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : undefined
+  if (typeof cl !== 'string' || cl.length === 0) return false
+  const n = Number(cl)
+  if (!Number.isFinite(n)) return false
+  if (n <= maxRequestBytes) return false
+
+  if (stream.destroyed || stream.closed) return true
+  try {
+    stream.respond({
+      [h2.HTTP2_HEADER_STATUS]: 413,
+      'content-type': 'application/json; charset=utf-8',
+    })
+    stream.end(
+      JSON.stringify({
+        error: `Request body exceeded ${maxRequestBytes} bytes`,
+        code: 'PAYLOAD_TOO_LARGE',
+      }),
+    )
+  } catch {
+    try {
+      stream.close(h2.NGHTTP2_INTERNAL_ERROR)
+    } catch {
+      stream.destroy()
+    }
+  }
+  return true
 }
 
 /**

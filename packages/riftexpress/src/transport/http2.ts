@@ -19,7 +19,8 @@ import type {
   Transport,
   TransportHooks,
 } from './types.ts'
-import { populateFromH2, writeH2Response } from './http2-helpers.ts'
+import { populateFromH2, rejectH2IfContentLengthTooBig, writeH2Response } from './http2-helpers.ts'
+import { createByteLimit } from '../body/limit.ts'
 
 /** TLS options accepted by the h2 (secure) adapter. */
 export interface Http2AdapterOptions {
@@ -128,9 +129,16 @@ async function handleStream(
   headers: Http2IncomingHeaders,
   hooks: TransportHooks,
 ): Promise<void> {
+  // Normalize the optional hook field — older fixtures may not set it.
+  const maxBytes = hooks.maxRequestBytes ?? Number.POSITIVE_INFINITY
+  // Reject oversized Content-Length BEFORE we acquire a context — the request
+  // is dead on arrival. Chunked / unknown-length bodies fall through to the
+  // byte-limit Transform installed by `populateFromH2`.
+  if (rejectH2IfContentLengthTooBig(stream, headers, maxBytes)) return
+
   const ctx = hooks.acquire()
   try {
-    populateFromH2(ctx, stream, headers)
+    populateFromH2(ctx, stream, headers, maxBytes)
     await hooks.dispatch(ctx)
     writeH2Response(ctx, stream)
   } finally {
@@ -151,6 +159,27 @@ async function handleHttp1Fallback(
   res: Http2ServerResponse,
   hooks: TransportHooks,
 ): Promise<void> {
+  // Same Content-Length pre-check as the pure-h1 NodeAdapter path.
+  const maxBytes = hooks.maxRequestBytes ?? Number.POSITIVE_INFINITY
+  if (Number.isFinite(maxBytes)) {
+    const raw = req.headers['content-length']
+    if (typeof raw === 'string' && raw.length > 0) {
+      const n = Number(raw)
+      if (Number.isFinite(n) && n > maxBytes) {
+        res.statusCode = 413
+        res.setHeader('content-type', 'application/json; charset=utf-8')
+        res.setHeader('connection', 'close')
+        res.end(
+          JSON.stringify({
+            error: `Request body exceeded ${maxBytes} bytes`,
+            code: 'PAYLOAD_TOO_LARGE',
+          }),
+        )
+        return
+      }
+    }
+  }
+
   const ctx = hooks.acquire()
   try {
     ctx.method = (req.method ?? 'GET') as HttpMethod
@@ -169,7 +198,8 @@ async function handleHttp1Fallback(
     const cl = req.headers['content-length']
     const contentLength = typeof cl === 'string' ? Number(cl) : undefined
     const ct = typeof req.headers['content-type'] === 'string' ? (req.headers['content-type'] as string) : undefined
-    ctx.body._attach(req, ct, Number.isFinite(contentLength) ? contentLength : undefined)
+    const source = Number.isFinite(maxBytes) ? req.pipe(createByteLimit(maxBytes)) : req
+    ctx.body._attach(source, ct, Number.isFinite(contentLength) ? contentLength : undefined)
 
     await hooks.dispatch(ctx)
 

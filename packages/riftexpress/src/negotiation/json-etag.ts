@@ -18,6 +18,37 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import { computeEtag } from './etag.ts'
 import type { ResponseBody } from '../context/context.ts'
+import { RiftexUnserializableError } from '../errors.ts'
+
+/**
+ * Strict `JSON.stringify` wrapper mirroring the one in `context.ts`. Kept
+ * inline rather than shared to avoid a circular import between
+ * `negotiation/` and `context/` (and so this helper stays consumable as a
+ * standalone with the lightweight `JsonEtagCtx` shape).
+ */
+function strictStringifyForEtag(body: unknown): string {
+  try {
+    return JSON.stringify(body) as string
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    let reason: string
+    if (/circular/i.test(msg)) reason = `circular structure (${msg})`
+    else if (/BigInt/i.test(msg)) reason = `BigInt value (${msg})`
+    else reason = msg
+    try {
+      process.emitWarning(
+        `RiftexUnserializableError: ${reason}`,
+        { type: 'RiftexUnserializableError' },
+      )
+    } catch {
+      // emitWarning unavailable — swallow.
+    }
+    throw new RiftexUnserializableError(
+      `Response body cannot be serialized: ${reason}`,
+      err,
+    )
+  }
+}
 
 /** Options for `respondJsonWithEtag`. */
 export interface JsonEtagOptions {
@@ -66,7 +97,7 @@ export function respondJsonWithEtag(
 ): void {
   const weak = opts.weak ?? true
   const status = opts.status ?? 200
-  const serialized = JSON.stringify(body)
+  const serialized = strictStringifyForEtag(body)
   const etag = computeEtag(serialized, weak)
 
   const inm = ctx.headers['if-none-match']

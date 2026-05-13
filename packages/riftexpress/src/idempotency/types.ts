@@ -63,6 +63,17 @@ export interface IdempotencyOptions {
    * extending this list if you need PUT semantics cached too.
    */
   methods?: readonly HttpMethod[]
+
+  /**
+   * Predicate deciding which response status codes are cacheable. Default:
+   * `(s) => s >= 200 && s < 500` — caches 2xx/3xx/4xx but NOT 5xx, matching
+   * Stripe's documented behavior. The intent: a transient 500 (DB blip,
+   * deploy race) must NOT be cached for the entire TTL — every retry would
+   * replay the same failure and the user would be permanently broken until
+   * the cache expires. Validation errors (4xx) are deterministic and worth
+   * caching. Override to opt in to 5xx caching or tighten further.
+   */
+  cacheable?: (statusCode: number) => boolean
 }
 
 /** Resolved options after defaults have been applied. Internal. */
@@ -72,4 +83,5 @@ export interface ResolvedIdempotencyOptions {
   ttlMs: number
   scope: (ctx: RiftexContext) => string
   methodSet: ReadonlySet<HttpMethod>
+  cacheable: (statusCode: number) => boolean
 }

@@ -103,6 +103,57 @@ The pitch in one sentence: **the shortest path from a working Express app to thr
 
 ---
 
+## Production hardening
+
+Native primitives an API team actually needs in prod, all opt-in:
+
+| Concern | Surface | Why it matters |
+|---|---|---|
+| Per-request timeout ceiling | `riftex({ requestTimeoutMs: 30_000 })` → `RiftexTimeoutError` (503) | A handler that never resolves leaks the context, socket, and pool slot forever. |
+| Hard request-body cap | `riftex({ maxRequestBytes: 2_000_000 })` enforced at the **transport** layer | Default-100KB per-call check doesn't help if the handler reads via `ctx.body.stream()`. Cap is enforced before any consumer touches a byte. |
+| Header injection guard | `ctx.set(name, value)` rejects `\r\n` immediately → `RiftexHeaderInjectionError` | Catches CRLF injection at the call site instead of deep inside Node's wire path. |
+| `ctx.json()` safety on circular refs / BigInt | Throws `RiftexUnserializableError` (500) with the structural reason | No more useless `TypeError: Converting circular...` bubbling up as a generic 500. `safeJsonStringify(value)` exported for lenient mode. |
+| Idempotency-Key — skip caching 5xx | `riftex.idempotency({ cacheable: (s) => s < 500 })` (default) | A transient 500 no longer gets replayed for the entire TTL. |
+| Compat shim — fail-loud on broken middleware | `expressCompat(bodyParser.json())` throws `TypeError` at registration | Silent failures of `express-session`, `multer`, `body-parser`, `compression` now point at the native equivalent. Opt out via `{ allowKnownBroken: true }`. |
+| Asymmetric JWT (RS/PS/ES + JWKS) | `riftex.jwt({ algorithms: ['RS256'], jwksUrl: '...' })` | Required for any IdP with a JWKS endpoint (Auth0, Okta, Cognito, Clerk, Supabase). Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally. |
+| Late-write protection | `_epoch` counter on `RiftexContext` — orphaned-handler writes after a timeout are detected and discarded | Stops cross-request response corruption when the pool recycles the context. |
+
+Wire all of these in production:
+
+```ts
+import {
+  riftex, sessionMiddleware, gracefulShutdown,
+  IdempotencyMemoryStore,
+} from 'riftexpress'
+
+const app = riftex({
+  trustProxy: 'loopback',                  // behind nginx / Caddy / etc.
+  requestTimeoutMs: 30_000,                // hung-handler protection
+  maxRequestBytes: 2 * 1024 * 1024,        // 2 MiB body ceiling
+  poolSize: 4096,
+})
+
+app.use(riftex.cors({ origin: 'https://app.example.com', credentials: true }))
+app.use(riftex.csrf({ secret: process.env.CSRF_SECRET! }))
+app.use(sessionMiddleware({ secret: [process.env.SESSION_SECRET!] }))
+app.use(riftex.rateLimit({ windowMs: 60_000, limit: 100 }))
+app.use(riftex.idempotency({ store: new IdempotencyMemoryStore() }))   // swap for RedisStore for multi-instance
+app.use(riftex.problemDetails({ typeBaseUrl: 'https://api.example.com/errors/' }))
+app.use(riftex.jwt({
+  algorithms: ['RS256'],
+  jwksUrl: 'https://example.auth0.com/.well-known/jwks.json',
+  issuer: 'https://example.auth0.com/',
+  audience: 'https://api.example.com',
+}))
+
+const server = await app.listen(cfg.PORT, '0.0.0.0')
+gracefulShutdown(server, { gracefulTimeoutMs: 10_000, onShutdown: () => db.close() })
+```
+
+> **Still NOT production-ready for multi-instance deploys:** the in-memory stores for sessions, idempotency, and rate-limit don't share state across pods. Redis-backed adapters are the next P0. See [docs/roadmap.md](docs/roadmap.md).
+
+---
+
 ## Install
 
 ```sh

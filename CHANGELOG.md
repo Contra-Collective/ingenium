@@ -11,7 +11,23 @@ deferred items and likely-to-shift surfaces.
 
 ## [Unreleased]
 
-### Added
+### Added — P0 production hardening (items 2–8)
+
+- **Per-request timeout** (`riftex({ requestTimeoutMs })`). New `RiftexTimeoutError` (503). Late-write protection via per-context `_epoch` counter — orphaned-handler writes after a timeout are detected and discarded so the next request bound to the same pooled context isn't corrupted.
+- **Hard request-body cap at the transport layer** (`riftex({ maxRequestBytes })`, default 2 MiB). Wrapped via `createByteLimit` Transform on the source stream so the cap applies regardless of which `ctx.body.*` consumer reads — including `ctx.body.stream()`. Content-Length pre-check rejects oversized requests with 413 before acquiring a context. Wired into NodeAdapter, BunAdapter, Http2Adapter, and Http2cAdapter.
+- **Asymmetric JWT (RS256/RS384/RS512, PS256/PS384/PS512, ES256/ES384/ES512)** + **JWKS support**. New `jwksUrl` / `jwksCacheMs` / `JwtKey` types. Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally — even if a caller adds it to `algorithms`. Built on `node:crypto` with zero new runtime deps. EC curves: P-256/P-384/P-521 (note: ES512 maps to curve P-521 per JOSE spec quirk). JWKS fetch coalesces concurrent requests into a single in-flight promise.
+- **Detect-and-throw on broken compat-shim middleware**. `expressCompat(bodyParser.json())`, `expressCompat(multer().single(...))`, `expressCompat(session(...))`, `expressCompat(compression())` now throw a `TypeError` at registration with a message naming the RiftExpress-native equivalent. Opt out with `expressCompat(mw, { allowKnownBroken: true })` to get a `process.emitWarning` instead.
+- **Header injection guard**. `ctx.set(name, value)` rejects values containing `\r` or `\n` immediately with `RiftexHeaderInjectionError` (500, code `HEADER_INJECTION`) — same for header names.
+- **`ctx.json()` safety on circular refs / BigInt / unserializable values**. Throws `RiftexUnserializableError` (500, code `UNSERIALIZABLE_RESPONSE`) with a structural reason instead of letting `JSON.stringify`'s `TypeError` bubble up as a generic 500. New `safeJsonStringify(value, opts?)` helper exported for lenient mode (handles circular refs as `[Circular]`, BigInt as JSON string).
+- **Idempotency-Key — skip caching 5xx by default**. `IdempotencyOptions.cacheable: (status) => boolean` (default `(s) => s >= 200 && s < 500`). Transient 500s no longer get replayed for the entire TTL; the in-flight promise resolves with `null` on uncacheable status so concurrent waiters fall through to a fresh handler run.
+- New error classes: `RiftexTimeoutError`, `RiftexHeaderInjectionError`, `RiftexUnserializableError`. New helper exports: `safeJsonStringify`, `fetchJwks`, `clearJwksCache`. New types: `JwtKey`.
+
+### Changed
+
+- `TransportHooks.maxRequestBytes` is a new optional field; the framework's `app.listen()` always populates it (default 2 MiB). Consumers normalize `undefined` to `Number.POSITIVE_INFINITY` for backward compat with adapters that predate the hook (`WsNodeAdapter`).
+- `jwtMiddleware` no longer throws at construction for `RS256`/`ES256`/etc. — those are now first-class. It still rejects `algorithms: ['none']` at construction.
+
+### Earlier in [Unreleased] — already shipped before this push
 
 - **CSRF protection.** Native `riftex.csrf(opts)` middleware (also exported as
   `csrfMiddleware`). Two storage modes:

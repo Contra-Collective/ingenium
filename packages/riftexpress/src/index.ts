@@ -69,7 +69,13 @@ export {
   RiftexPayloadTooLargeError,
   RiftexValidationError,
   RiftexBadRequestError,
+  RiftexHeaderInjectionError,
+  RiftexUnserializableError,
+  RiftexTimeoutError,
 } from './errors.ts'
+
+// ───── JSON serialization helpers ──────────────────────────────────────────
+export { safeJsonStringify, type SafeJsonStringifyOptions } from './util/safe-json.ts'
 
 // ───── Transport (mainly for advanced users / tests) ───────────────────────
 export type { Transport, TransportHooks, ListeningServer, CloseOptions } from './transport/types.ts'
@@ -138,9 +144,11 @@ export type {
 // ───── JWT middleware ──────────────────────────────────────────────────────
 export { jwtMiddleware } from './jwt/middleware.ts'
 export { verifyJwt } from './jwt/verify.ts'
+export { fetchJwks, clearJwksCache } from './jwt/jwks.ts'
 export type {
   JwtAlgorithm,
   JwtHeader,
+  JwtKey,
   JwtOptions,
   JwtSecret,
   JwtSecretResolver,

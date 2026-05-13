@@ -1,19 +1,29 @@
+import { Buffer } from 'node:buffer'
+import type { KeyObject } from 'node:crypto'
 import { RiftexUnauthorizedError } from '../errors.ts'
 import type { RiftexMiddleware } from '../middleware/types.ts'
 import type { RiftexContext } from '../context/context.ts'
 import type {
   JwtAlgorithm,
   JwtHeader,
+  JwtKey,
   JwtOptions,
   JwtSecret,
   JwtSecretResolver,
   JwtTokenReader,
   JwtVerified,
 } from './types.ts'
-import { verifyJwt } from './verify.ts'
+import { verifyJwt, type KidTaggedKey, type VerifyKeyMaterial } from './verify.ts'
+import { fetchJwks } from './jwks.ts'
 
 const DEFAULT_ALGORITHMS: readonly JwtAlgorithm[] = ['HS256']
-const SUPPORTED: ReadonlySet<JwtAlgorithm> = new Set(['HS256', 'HS384', 'HS512'])
+const DEFAULT_JWKS_TTL_MS = 10 * 60 * 1000
+const SUPPORTED: ReadonlySet<JwtAlgorithm> = new Set([
+  'HS256', 'HS384', 'HS512',
+  'RS256', 'RS384', 'RS512',
+  'PS256', 'PS384', 'PS512',
+  'ES256', 'ES384', 'ES512',
+])
 
 /** Default token reader — `Authorization: Bearer <token>`. */
 const defaultGetToken: JwtTokenReader = (ctx) => {
@@ -35,7 +45,7 @@ const defaultGetToken: JwtTokenReader = (ctx) => {
  *
  * Attaches the verified token at `ctx.jwt`. Callers should module-augment
  * `RiftexContext` for typed access (the framework purposely doesn't ship a
- * baked-in `jwt` field — payload shape is application-specific):
+ * baked-in `jwt` field — payload shape is application-specific).
  *
  * @example
  * ```ts
@@ -47,18 +57,30 @@ const defaultGetToken: JwtTokenReader = (ctx) => {
  *
  * import { riftex } from 'riftexpress'
  * const app = riftex()
+ * // HMAC
  * app.use(riftex.jwt({ secret: process.env.JWT_SECRET! }))
- * app.get('/me', (ctx) => ({ sub: ctx.jwt!.payload.sub }))
+ * // RSA via JWKS (Auth0, Okta, Cognito, Clerk, Supabase, ...)
+ * app.use(riftex.jwt({
+ *   secret: [],
+ *   algorithms: ['RS256'],
+ *   jwksUrl: 'https://example.auth0.com/.well-known/jwks.json',
+ *   issuer: 'https://example.auth0.com/',
+ *   audience: 'https://api.example.com',
+ * }))
  * ```
  *
  * Security choices:
  * - Default leeway (`clockSkewSeconds`) is **5 seconds** — enough for typical
  *   multi-host clock drift, small enough that an expired token does not stay
  *   usable for long.
- * - Signature comparison uses `crypto.timingSafeEqual` after an explicit
- *   length check inside {@link verifyJwt}.
- * - Only HMAC algorithms (HS256/HS384/HS512) are supported in v0.0.1; asking
- *   for RS\* / ES\* throws at construction.
+ * - HMAC signature comparison uses `crypto.timingSafeEqual` after an explicit
+ *   length check inside {@link verifyJwt}; asymmetric verification uses
+ *   `crypto.verify` (constant-time within OpenSSL).
+ * - The algorithm allowlist is enforced at verify time. Even if an attacker
+ *   crafts `alg: 'RS256'` and we have a matching JWKS key, verification fails
+ *   unless `RS256` appears in `algorithms`. This is the canonical defence
+ *   against algorithm-confusion attacks.
+ * - `'none'` is rejected unconditionally, regardless of the allowlist.
  * - The wire-facing error is always `RiftexUnauthorizedError('Invalid token')`
  *   regardless of which check failed (signature vs exp vs aud) — this avoids
  *   handing attackers an oracle. Detailed reasons go to `opts.logger` (or
@@ -68,8 +90,16 @@ export function jwtMiddleware<T = Record<string, unknown>>(
   opts: JwtOptions<T>,
 ): RiftexMiddleware {
   // ── Construction-time validation ─────────────────────────────────────────
-  if (opts == null || (opts.secret as unknown) === undefined || opts.secret === null) {
-    throw new Error('jwtMiddleware: `secret` is required')
+  if (opts == null) {
+    throw new Error('jwtMiddleware: options object is required')
+  }
+  // `secret` may be an empty array when the caller is leaning entirely on
+  // `jwksUrl` for key material — treat that as a valid configuration.
+  const hasJwks = typeof opts.jwksUrl === 'string' && opts.jwksUrl.length > 0
+  if ((opts.secret as unknown) === undefined || opts.secret === null) {
+    if (!hasJwks) {
+      throw new Error('jwtMiddleware: `secret` (or `jwksUrl`) is required')
+    }
   }
 
   const algorithms = (opts.algorithms ?? DEFAULT_ALGORITHMS).slice() as JwtAlgorithm[]
@@ -77,59 +107,67 @@ export function jwtMiddleware<T = Record<string, unknown>>(
     throw new Error('jwtMiddleware: `algorithms` must contain at least one algorithm')
   }
   for (const alg of algorithms) {
+    // 'none' is never permitted, even if a caller adds it to the allowlist.
+    if ((alg as unknown as string) === 'none') {
+      throw new Error('jwtMiddleware: `alg: "none"` is forbidden')
+    }
     if (!SUPPORTED.has(alg)) {
-      // Strict v0.0.1 message — keep wording stable for downstream tests.
-      // Cast to widen: callers may pass any string, the JwtAlgorithm union is
-      // an interface contract not a runtime guarantee.
-      const wide = alg as unknown as string
-      if (wide.startsWith('RS') || wide.startsWith('ES') || wide.startsWith('PS') || wide.startsWith('Ed')) {
-        throw new Error(`${wide} not supported in v0.0.1; pin to an HSxxx algorithm`)
-      }
-      throw new Error(`jwtMiddleware: unsupported algorithm ${wide}`)
+      throw new Error(`jwtMiddleware: unsupported algorithm ${String(alg)}`)
     }
   }
 
   const required = opts.required ?? true
   const clockSkewSeconds = opts.clockSkewSeconds ?? 5
+  const jwksCacheMs = opts.jwksCacheMs ?? DEFAULT_JWKS_TTL_MS
+  const jwksUrl = hasJwks ? opts.jwksUrl! : null
   const getToken = opts.getToken ?? defaultGetToken
   const logger = opts.logger ?? ((event) => {
     process.emitWarning(`jwt verification failed: ${event.reason}`, 'RiftexJwtWarning')
   })
 
-  const staticSecrets = resolveStaticSecrets(opts.secret)
-  const secretResolver = typeof opts.secret === 'function' ? (opts.secret as JwtSecretResolver) : null
+  const staticKeys = opts.secret != null && typeof opts.secret !== 'function'
+    ? normaliseStaticKeys(opts.secret as JwtKey | JwtKey[])
+    : []
+  const keyResolver =
+    typeof opts.secret === 'function'
+      ? (opts.secret as JwtSecretResolver<T>)
+      : null
 
   return async (ctx, next) => {
     const token = await getToken(ctx)
     if (!token) {
       if (required) {
-        // Missing token IS allowed to leak (it's not an oracle — no secret material involved).
+        // Missing token IS allowed to leak (no secret material involved).
         throw new RiftexUnauthorizedError('Missing token')
       }
       await next()
       return
     }
 
-    // Resolve secrets per-request when a function was supplied.
-    let secrets: readonly string[]
-    if (secretResolver) {
-      // Peek at the header so the resolver can route by `kid`. If the header
-      // is unparseable we still let the verifier produce the canonical error.
-      const peeked = peekHeader(token)
-      try {
-        const resolved = await secretResolver(peeked ?? ({ alg: '' } as JwtHeader))
-        if (typeof resolved !== 'string' || resolved.length === 0) {
-          logger({ reason: 'secret_resolver_returned_empty' })
-          throw new RiftexUnauthorizedError('Invalid token')
-        }
-        secrets = [resolved]
-      } catch (err) {
-        if (err instanceof RiftexUnauthorizedError) throw err
-        logger({ reason: 'secret_resolver_threw' })
-        throw new RiftexUnauthorizedError('Invalid token')
-      }
-    } else {
-      secrets = staticSecrets
+    // Peek the header so resolvers / JWKS can route by `kid`. Malformed
+    // tokens still reach the verifier so they get the canonical error.
+    const peeked = peekHeader(token)
+
+    // Build the candidate key list for this request.
+    let keys: (VerifyKeyMaterial | KidTaggedKey)[]
+    try {
+      keys = await collectKeys({
+        peeked,
+        staticKeys,
+        keyResolver,
+        jwksUrl,
+        jwksCacheMs,
+      })
+    } catch (err) {
+      if (err instanceof RiftexUnauthorizedError) throw err
+      const reason = err instanceof Error ? err.message : 'key_resolution_failed'
+      logger({ reason })
+      throw new RiftexUnauthorizedError('Invalid token')
+    }
+
+    if (keys.length === 0) {
+      logger({ reason: 'no_keys_available' })
+      throw new RiftexUnauthorizedError('Invalid token')
     }
 
     // Build VerifyOptions without spreading undefined keys (exactOptionalPropertyTypes).
@@ -137,7 +175,7 @@ export function jwtMiddleware<T = Record<string, unknown>>(
     if (opts.audience !== undefined) verifyOpts.audience = opts.audience
     if (opts.issuer !== undefined) verifyOpts.issuer = opts.issuer
     if (opts.maxAgeSeconds !== undefined) verifyOpts.maxAgeSeconds = opts.maxAgeSeconds
-    const result = verifyJwt<T>(token, secrets, verifyOpts)
+    const result = verifyJwt<T>(token, keys, verifyOpts)
 
     if ('error' in result) {
       logger({ reason: result.error })
@@ -149,27 +187,111 @@ export function jwtMiddleware<T = Record<string, unknown>>(
   }
 }
 
-/** Normalize string / string[] secrets to a flat readonly array. */
-function resolveStaticSecrets(secret: JwtSecret): readonly string[] {
-  if (typeof secret === 'function') return []
-  if (typeof secret === 'string') {
-    if (secret.length === 0) {
-      throw new Error('jwtMiddleware: `secret` must be a non-empty string')
-    }
-    return [secret]
+/**
+ * Normalise the static `secret` option to a flat array of either raw key
+ * material or kid-tagged entries that `verifyJwt` understands.
+ *
+ * Accepts string / Buffer / KeyObject and the `{ kid, key }` wrapper.
+ */
+function normaliseStaticKeys(secret: JwtKey | JwtKey[]): (VerifyKeyMaterial | KidTaggedKey)[] {
+  const list = Array.isArray(secret) ? secret : [secret]
+  if (list.length === 0) {
+    // An empty literal array IS allowed when paired with jwksUrl; the
+    // top-level construction-time check already validated that constraint.
+    return []
   }
-  if (Array.isArray(secret)) {
-    if (secret.length === 0) {
-      throw new Error('jwtMiddleware: `secret` array must contain at least one secret')
+  const out: (VerifyKeyMaterial | KidTaggedKey)[] = []
+  for (const k of list) {
+    out.push(coerceJwtKey(k))
+  }
+  return out
+}
+
+function coerceJwtKey(k: JwtKey): VerifyKeyMaterial | KidTaggedKey {
+  if (typeof k === 'string') {
+    if (k.length === 0) {
+      throw new Error('jwtMiddleware: secret string must not be empty')
     }
-    for (const s of secret) {
-      if (typeof s !== 'string' || s.length === 0) {
-        throw new Error('jwtMiddleware: every secret in the array must be a non-empty string')
+    return k
+  }
+  if (Buffer.isBuffer(k)) return k
+  if (isKeyObject(k)) return k
+  if (typeof k === 'object' && k !== null && 'kid' in k && 'key' in k) {
+    if (typeof k.kid !== 'string' || k.kid.length === 0) {
+      throw new Error('jwtMiddleware: keyed entry requires a non-empty `kid`')
+    }
+    const key = k.key
+    if (typeof key === 'string') {
+      if (key.length === 0) throw new Error('jwtMiddleware: keyed entry `key` must not be empty')
+      return { kid: k.kid, key }
+    }
+    if (Buffer.isBuffer(key) || isKeyObject(key)) return { kid: k.kid, key }
+  }
+  throw new Error('jwtMiddleware: invalid `secret` entry — expected string, Buffer, KeyObject, or { kid, key }')
+}
+
+function isKeyObject(v: unknown): v is KeyObject {
+  // Avoid a hard import-time check; KeyObjects from node:crypto carry a
+  // distinctive `asymmetricKeyType` getter or `type` property of
+  // 'public' | 'private' | 'secret'.
+  if (typeof v !== 'object' || v === null) return false
+  const t = (v as { type?: unknown }).type
+  return t === 'public' || t === 'private' || t === 'secret'
+}
+
+interface CollectKeysCtx<T> {
+  peeked: JwtHeader | null
+  staticKeys: (VerifyKeyMaterial | KidTaggedKey)[]
+  keyResolver: JwtSecretResolver<T> | null
+  jwksUrl: string | null
+  jwksCacheMs: number
+}
+
+async function collectKeys<T>(ctx: CollectKeysCtx<T>): Promise<(VerifyKeyMaterial | KidTaggedKey)[]> {
+  const out: (VerifyKeyMaterial | KidTaggedKey)[] = ctx.staticKeys.slice()
+
+  if (ctx.keyResolver) {
+    const resolved = await ctx.keyResolver(ctx.peeked ?? ({ alg: '' } as JwtHeader))
+    if (resolved == null) {
+      throw new Error('secret_resolver_returned_empty')
+    }
+    if (typeof resolved === 'string') {
+      if (resolved.length === 0) throw new Error('secret_resolver_returned_empty')
+      out.push(resolved)
+    } else {
+      out.push(coerceJwtKey(resolved as JwtKey))
+    }
+  }
+
+  if (ctx.jwksUrl) {
+    let jwks: Map<string, KeyObject>
+    try {
+      jwks = await fetchJwks(ctx.jwksUrl, ctx.jwksCacheMs)
+    } catch {
+      // Don't leak upstream details to clients OR to the logger reason —
+      // a single canonical reason is enough for ops.
+      throw new RiftexUnauthorizedError('Token key fetch failed')
+    }
+    const headerKid = ctx.peeked && typeof ctx.peeked.kid === 'string' ? ctx.peeked.kid : null
+    if (headerKid) {
+      const match = jwks.get(headerKid)
+      if (match) out.push({ kid: headerKid, key: match })
+      // No-match isn't fatal here; verifier returns kid_unknown if the
+      // entire candidate set is empty after key selection.
+    } else {
+      // No kid on the token — try every key in the JWKS as a tagged entry.
+      for (const [kid, key] of jwks) {
+        out.push({ kid, key })
+      }
+      // Also expose them untagged so the verifier's `selectCandidates` will
+      // try them when the header lacks `kid`.
+      for (const [, key] of jwks) {
+        out.push(key)
       }
     }
-    return secret.slice()
   }
-  throw new Error('jwtMiddleware: `secret` must be a string, string[], or function')
+
+  return out
 }
 
 /** Best-effort header peek for resolver routing. Returns null on malformed tokens. */
@@ -186,3 +308,6 @@ function peekHeader(token: string): JwtHeader | null {
     return null
   }
 }
+
+// Backwards-compat re-exports for downstream code that imported these names.
+export type { JwtSecret, JwtSecretResolver }

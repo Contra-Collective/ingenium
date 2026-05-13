@@ -19,6 +19,19 @@ export interface TransportHooks {
   acquire: TransportAcquire
   release: TransportRelease
   dispatch: TransportDispatch
+  /**
+   * Hard ceiling (bytes) on the total request body. Adapters SHOULD wrap the
+   * inbound body stream in `createByteLimit(maxRequestBytes)` before handing
+   * it to `ctx.body._attach(...)`, AND reject with a 413 immediately when
+   * the request advertises a `Content-Length` greater than this value (no
+   * need to read the body). `Number.POSITIVE_INFINITY` disables the cap.
+   *
+   * Optional for backward compatibility with adapters / test fixtures that
+   * predate this hook. The framework's `app.listen()` always populates the
+   * field (default 2 MiB); consumers that read it should treat `undefined`
+   * as "no cap" (`Number.POSITIVE_INFINITY`).
+   */
+  maxRequestBytes?: number
 }
 
 /** Options accepted by {@link ListeningServer.close}. */

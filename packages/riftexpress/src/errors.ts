@@ -69,3 +69,40 @@ export class RiftexBadRequestError extends RiftexError {
     super(400, 'BAD_REQUEST', message, cause)
   }
 }
+
+/**
+ * 500 — caller attempted to write a header name or value containing CR or
+ * LF. Node would eventually reject these at the wire level, but the late
+ * throw produces a useless stack — we fail fast at the call site so the
+ * offending header (and the route that set it) shows up in the trace.
+ */
+export class RiftexHeaderInjectionError extends RiftexError {
+  constructor(message = 'Header value contains CR/LF (possible header injection)') {
+    super(500, 'HEADER_INJECTION', message)
+  }
+}
+
+/**
+ * 500 — `ctx.json` (or `respondJsonWithEtag`) was handed a value that
+ * `JSON.stringify` cannot serialize: a circular structure, a `BigInt`, or
+ * any other unsupported shape. The original `TypeError` is attached as
+ * `cause` and emitted via `process.emitWarning` for diagnostics.
+ */
+export class RiftexUnserializableError extends RiftexError {
+  constructor(message: string, cause?: unknown) {
+    super(500, 'UNSERIALIZABLE_RESPONSE', message, cause)
+  }
+}
+
+/**
+ * 503 — handler exceeded the configured `requestTimeoutMs` ceiling. The
+ * orphaned handler is NOT cancelled (JavaScript can't safely cancel a
+ * Promise); the framework just stops waiting for it. Late writes from the
+ * orphaned handler are guarded by the per-request epoch counter on the
+ * context and discarded with a `process.emitWarning`.
+ */
+export class RiftexTimeoutError extends RiftexError {
+  constructor(timeoutMs: number, message?: string) {
+    super(503, 'REQUEST_TIMEOUT', message ?? `Request exceeded ${timeoutMs}ms`)
+  }
+}

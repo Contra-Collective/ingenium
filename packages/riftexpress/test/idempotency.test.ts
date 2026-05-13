@@ -195,6 +195,114 @@ describe('idempotency — TTL expiry', () => {
   })
 })
 
+describe('idempotency — cacheable predicate (5xx skipped by default)', () => {
+  it('200 response is cached → second request replays', async () => {
+    const store = new IdempotencyMemoryStore()
+    const mw = idempotencyMiddleware({ store })
+    const headers = { 'idempotency-key': 'k200', authorization: 'Bearer A' }
+
+    const a = makeCtx('POST', '/x', headers)
+    const h1 = vi.fn(async () => { a.json({ run: 1 }, 200) })
+    await mw(a, h1)
+
+    const b = makeCtx('POST', '/x', headers)
+    const h2 = vi.fn(async () => { b.json({ run: 2 }, 200) })
+    await mw(b, h2)
+
+    expect(h1).toHaveBeenCalledTimes(1)
+    expect(h2).not.toHaveBeenCalled()
+    expect(readJson(b)).toEqual({ run: 1 })
+    expect(b.getHeader('idempotent-replayed')).toBe('true')
+    store.destroy()
+  })
+
+  it('4xx response IS cached by default → validation errors are deterministic', async () => {
+    const store = new IdempotencyMemoryStore()
+    const mw = idempotencyMiddleware({ store })
+    const headers = { 'idempotency-key': 'k4xx', authorization: 'Bearer A' }
+
+    const a = makeCtx('POST', '/x', headers)
+    const h1 = vi.fn(async () => { a.json({ error: 'bad' }, 422) })
+    await mw(a, h1)
+
+    const b = makeCtx('POST', '/x', headers)
+    const h2 = vi.fn(async () => { b.json({ error: 'WRONG' }, 422) })
+    await mw(b, h2)
+
+    expect(h1).toHaveBeenCalledTimes(1)
+    expect(h2).not.toHaveBeenCalled()
+    expect(b._statusCode).toBe(422)
+    expect(readJson(b)).toEqual({ error: 'bad' })
+    expect(b.getHeader('idempotent-replayed')).toBe('true')
+    store.destroy()
+  })
+
+  it('500 response is NOT cached by default → second request re-runs handler', async () => {
+    const store = new IdempotencyMemoryStore()
+    const mw = idempotencyMiddleware({ store })
+    const headers = { 'idempotency-key': 'k500', authorization: 'Bearer A' }
+
+    const a = makeCtx('POST', '/x', headers)
+    const h1 = vi.fn(async () => { a.json({ err: 'transient' }, 500) })
+    await mw(a, h1)
+    expect(h1).toHaveBeenCalledTimes(1)
+
+    // Cache should be empty for this key.
+    expect(await store.get('Bearer A:POST:/x:k500')).toBeNull()
+
+    const b = makeCtx('POST', '/x', headers)
+    const h2 = vi.fn(async () => { b.json({ ok: true }, 200) })
+    await mw(b, h2)
+
+    expect(h2).toHaveBeenCalledTimes(1)
+    expect(b._statusCode).toBe(200)
+    expect(readJson(b)).toEqual({ ok: true })
+    expect(b.getHeader('idempotent-replayed')).toBeUndefined()
+    store.destroy()
+  })
+
+  it('custom cacheable: () => true → 500 IS cached', async () => {
+    const store = new IdempotencyMemoryStore()
+    const mw = idempotencyMiddleware({ store, cacheable: () => true })
+    const headers = { 'idempotency-key': 'k500-forced', authorization: 'Bearer A' }
+
+    const a = makeCtx('POST', '/x', headers)
+    const h1 = vi.fn(async () => { a.json({ err: 'boom' }, 500) })
+    await mw(a, h1)
+
+    const b = makeCtx('POST', '/x', headers)
+    const h2 = vi.fn(async () => { b.json({ never: true }, 200) })
+    await mw(b, h2)
+
+    expect(h2).not.toHaveBeenCalled()
+    expect(b._statusCode).toBe(500)
+    expect(readJson(b)).toEqual({ err: 'boom' })
+    expect(b.getHeader('idempotent-replayed')).toBe('true')
+    store.destroy()
+  })
+
+  it('custom cacheable: (s) => s === 200 → 4xx is NOT cached', async () => {
+    const store = new IdempotencyMemoryStore()
+    const mw = idempotencyMiddleware({ store, cacheable: (s) => s === 200 })
+    const headers = { 'idempotency-key': 'k-strict', authorization: 'Bearer A' }
+
+    const a = makeCtx('POST', '/x', headers)
+    const h1 = vi.fn(async () => { a.json({ error: 'bad' }, 422) })
+    await mw(a, h1)
+    expect(h1).toHaveBeenCalledTimes(1)
+    expect(await store.get('Bearer A:POST:/x:k-strict')).toBeNull()
+
+    const b = makeCtx('POST', '/x', headers)
+    const h2 = vi.fn(async () => { b.json({ run: 2 }, 200) })
+    await mw(b, h2)
+
+    expect(h2).toHaveBeenCalledTimes(1)
+    expect(readJson(b)).toEqual({ run: 2 })
+    expect(b.getHeader('idempotent-replayed')).toBeUndefined()
+    store.destroy()
+  })
+})
+
 describe('IdempotencyMemoryStore', () => {
   it('destroy() clears the cleanup interval and the map', async () => {
     const store = new IdempotencyMemoryStore()

@@ -1,6 +1,7 @@
 import type { RiftexContext, RiftexMiddleware } from 'riftexpress'
 import { createReqShim, syncReqStateBack, type RiftexReqShim } from './req-shim.ts'
 import { createResShim, type RiftexResShim } from './res-shim.ts'
+import { detectKnownBroken, formatBrokenMessage } from './known-broken.ts'
 
 /**
  * Express-style middleware signature. We use loose `any` here on purpose:
@@ -13,6 +14,25 @@ import { createResShim, type RiftexResShim } from './res-shim.ts'
 export type ExpressMiddleware = (req: any, res: any, next: (err?: unknown) => void) => void
 
 /**
+ * Options for `expressCompat`.
+ */
+export interface ExpressCompatOptions {
+  /**
+   * Bypass the detect-and-throw guard for known-broken middleware
+   * (`body-parser`, `multer`, `express-session`, `compression`).
+   *
+   * When `true`, `expressCompat` emits a `process.emitWarning(...)` instead
+   * of throwing, and returns the wrapping middleware as usual. The
+   * underlying compatibility problem is unchanged — sessions still won't
+   * persist, body-parser still hangs, etc. Use only if you have a very
+   * specific reason and have read COMPATIBILITY.md.
+   *
+   * @default false
+   */
+  allowKnownBroken?: boolean
+}
+
+/**
  * Wrap an Express-style `(req, res, next)` middleware so it can run inside
  * a RiftExpress middleware chain.
  *
@@ -22,8 +42,26 @@ export type ExpressMiddleware = (req: any, res: any, next: (err?: unknown) => vo
  *  - If the middleware calls `next()` without writing, the Riftex chain continues.
  *  - If the middleware calls `next(err)`, the wrapper rejects with that error
  *    so it flows to the global onError boundary.
+ *
+ * If `middleware` is one of a known-broken set (see `known-broken.ts` and
+ * `COMPATIBILITY.md`), this throws a `TypeError` at registration so users
+ * get a loud, actionable error pointing at the RiftExpress-native
+ * equivalent. Pass `{ allowKnownBroken: true }` to downgrade to a warning.
  */
-export function expressCompat(middleware: ExpressMiddleware): RiftexMiddleware {
+export function expressCompat(
+  middleware: ExpressMiddleware,
+  options: ExpressCompatOptions = {},
+): RiftexMiddleware {
+  const detected = detectKnownBroken(middleware)
+  if (detected) {
+    const message = formatBrokenMessage(detected)
+    if (options.allowKnownBroken) {
+      process.emitWarning(message, 'RiftexCompatKnownBroken')
+    } else {
+      throw new TypeError(message)
+    }
+  }
+
   return async (ctx: RiftexContext, next: () => Promise<void>): Promise<void> => {
     const req: RiftexReqShim = createReqShim(ctx)
     const res: RiftexResShim = createResShim(ctx)
@@ -88,3 +126,5 @@ export function expressCompat(middleware: ExpressMiddleware): RiftexMiddleware {
 
 export { createReqShim } from './req-shim.ts'
 export { createResShim } from './res-shim.ts'
+export { detectKnownBroken, KNOWN_BROKEN, formatBrokenMessage } from './known-broken.ts'
+export type { KnownBrokenEntry, DetectedBroken } from './known-broken.ts'
