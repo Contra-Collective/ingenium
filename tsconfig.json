@@ -8,7 +8,8 @@
       "riftexpress/*": ["./packages/riftexpress/src/*"],
       "riftexpress-compat": ["./packages/riftexpress-compat/src/index.ts"],
       "riftexpress-bun": ["./packages/riftexpress-bun/src/index.ts"],
-      "riftexpress-cli": ["./packages/riftexpress-cli/src/cli.ts"]
+      "riftexpress-cli": ["./packages/riftexpress-cli/src/cli.ts"],
+      "riftexpress-redis": ["./packages/riftexpress-redis/src/index.ts"]
     }
   },
   "include": [
@@ -19,6 +20,8 @@
     "packages/riftexpress-bun/src/**/*",
     "packages/riftexpress-bun/test/**/*",
     "packages/riftexpress-cli/src/**/*",
-    "packages/riftexpress-cli/test/**/*"
+    "packages/riftexpress-cli/test/**/*",
+    "packages/riftexpress-redis/src/**/*",
+    "packages/riftexpress-redis/test/**/*"
   ]
 }

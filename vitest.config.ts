@@ -10,6 +10,7 @@ export default defineConfig({
       'riftexpress-compat': here('./packages/riftexpress-compat/src/index.ts'),
       'riftexpress-bun': here('./packages/riftexpress-bun/src/index.ts'),
       'riftexpress-cli': here('./packages/riftexpress-cli/src/cli.ts'),
+      'riftexpress-redis': here('./packages/riftexpress-redis/src/index.ts'),
       riftexpress: here('./packages/riftexpress/src/index.ts'),
     },
   },

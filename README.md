@@ -137,7 +137,7 @@ app.use(riftex.cors({ origin: 'https://app.example.com', credentials: true }))
 app.use(riftex.csrf({ secret: process.env.CSRF_SECRET! }))
 app.use(sessionMiddleware({ secret: [process.env.SESSION_SECRET!] }))
 app.use(riftex.rateLimit({ windowMs: 60_000, limit: 100 }))
-app.use(riftex.idempotency({ store: new IdempotencyMemoryStore() }))   // swap for RedisStore for multi-instance
+app.use(riftex.idempotency({ store: new IdempotencyMemoryStore() }))   // swap for RedisIdempotencyStore (riftexpress-redis) for multi-instance
 app.use(riftex.problemDetails({ typeBaseUrl: 'https://api.example.com/errors/' }))
 app.use(riftex.jwt({
   algorithms: ['RS256'],
@@ -150,7 +150,7 @@ const server = await app.listen(cfg.PORT, '0.0.0.0')
 gracefulShutdown(server, { gracefulTimeoutMs: 10_000, onShutdown: () => db.close() })
 ```
 
-> **Still NOT production-ready for multi-instance deploys:** the in-memory stores for sessions, idempotency, and rate-limit don't share state across pods. Redis-backed adapters are the next P0. See [docs/roadmap.md](docs/roadmap.md).
+> **Multi-instance deploys:** swap the in-memory stores for the Redis-backed ones in [`riftexpress-redis`](packages/riftexpress-redis). One `createClient()` instance, three drop-in stores, no API changes elsewhere. See the package [README](packages/riftexpress-redis/README.md) for the wire-in.
 
 ---
 
@@ -168,6 +168,9 @@ npm install riftexpress riftexpress-bun
 
 # Express middleware compatibility (cors, helmet, etc.)
 npm install riftexpress riftexpress-compat
+
+# Redis stores for multi-instance prod (sessions, idempotency, rate-limit)
+npm install riftexpress riftexpress-redis redis
 
 # Project scaffolder
 npm install -g riftexpress-cli
@@ -780,6 +783,7 @@ npm run dev
 | [`riftexpress-compat`](packages/riftexpress-compat) | `expressCompat(mw)` shim for `(req, res, next)` middleware |
 | [`riftexpress-bun`](packages/riftexpress-bun) | `BunAdapter` — drop-in transport for `Bun.serve()` |
 | [`riftexpress-cli`](packages/riftexpress-cli) | `riftex new <name> [--bun\|--minimal]` scaffolder |
+| [`riftexpress-redis`](packages/riftexpress-redis) | `RedisSessionStore`, `RedisIdempotencyStore`, `RedisRateLimitStore` — required for multi-instance deployments |
 
 Each package is independently publishable to npm.
 
@@ -789,6 +793,7 @@ Each package is independently publishable to npm.
 
 | Example | Demonstrates |
 |---|---|
+| [`examples/learn`](examples/learn) | **Start here.** 8-step progressive tutorial — one concept per file, ~30 minutes end-to-end |
 | [`examples/basic`](examples/basic) | Hello world, params, body, error handler, graceful shutdown, static files, decorator |
 | [`examples/migrate-from-express`](examples/migrate-from-express) | Express version + RiftExpress version side by side, identical routes |
 | [`examples/with-plugin`](examples/with-plugin) | Custom auth plugin, decorator, hooks, module augmentation |
@@ -885,7 +890,6 @@ See [docs/roadmap.md](docs/roadmap.md) for the full breakdown. Highlights:
 - HEAD requests on static files fall through to `next()` instead of returning headers-only
 
 **Deferred to next session:**
-- Native rate-limit Redis store
 - Plugin scoping (Fastify-style sub-app affinity)
 - TypeBox-specific bridge (Standard Schema covers it but a tighter integration could be cleaner)
 
