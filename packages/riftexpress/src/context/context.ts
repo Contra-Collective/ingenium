@@ -1,7 +1,8 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { RiftexBody } from './body.ts'
+import { RiftexBody, type ParseSchema, type SafeParseSchema } from './body.ts'
+import { isStandardSchema, type StandardIssue, type StandardSchemaV1 } from '../schema/standard.ts'
 import type { HttpMethod } from '../router/types.ts'
 import { resolveForwarded, type ForwardedInfo, type TrustProxy } from '../proxy/trust.ts'
 import {
@@ -13,7 +14,12 @@ import {
 import { formatResponse, type FormatHandlers } from '../negotiation/format.ts'
 import { isFresh } from '../negotiation/fresh.ts'
 import { respondJsonWithEtag, type JsonEtagOptions } from '../negotiation/json-etag.ts'
-import { RiftexHaltError, RiftexHeaderInjectionError, RiftexUnserializableError } from '../errors.ts'
+import {
+  RiftexHaltError,
+  RiftexHeaderInjectionError,
+  RiftexUnserializableError,
+  RiftexValidationError,
+} from '../errors.ts'
 
 /** CR/LF detector for header-injection guard. Tested against names + values. */
 const CRLF_RE = /[\r\n]/
@@ -92,6 +98,125 @@ function strictStringify(body: unknown): string {
 /** Sentinel for routes with no params — frozen, so `ctx.params.foo` is safe. */
 const EMPTY_PARAMS = Object.freeze(Object.create(null) as Record<string, string>)
 
+/**
+ * `URLSearchParams` augmented with a `parse(schema)` method that runs the
+ * query through the same schema-detection pipeline as `ctx.body.json(schema)`.
+ *
+ * The shape passed to the schema is a **shallow array-aware** object:
+ *
+ *   `?id=42&tag=a&tag=b&active=true`
+ *     → `{ id: '42', tag: ['a','b'], active: 'true' }`
+ *
+ * Single-occurrence keys → `string`. Repeated keys → `string[]`. Everything is
+ * a string on the wire, so the user's schema is responsible for coercing
+ * numbers/booleans (Zod: use `z.coerce.number()`; ArkType: use `'string.numeric.parse'`).
+ *
+ * Rationale for picking THIS coercion over alternatives:
+ *   - "raw strings only" loses repeated-key fidelity (qs/Express-style arrays)
+ *   - "pre-coerced booleans/numbers" surprises users when "12foo" silently
+ *     becomes a string or "true" becomes a boolean against their schema
+ *   - Shallow-array matches `Object.fromEntries` semantics PLUS the most
+ *     common ergonomic ask (tag=a&tag=b → tag: string[])
+ */
+export interface RiftexQuery extends URLSearchParams {
+  parse<T = unknown>(
+    schema: StandardSchemaV1<unknown, T> | SafeParseSchema<T> | ParseSchema<T>,
+  ): T
+}
+
+/** Normalize a Standard Schema issue path into a dot-joined field key. */
+function queryPathToField(path: StandardIssue['path']): string {
+  if (!path || path.length === 0) return '_'
+  const parts: string[] = []
+  for (const seg of path) {
+    if (seg !== null && typeof seg === 'object' && 'key' in seg) {
+      parts.push(String(seg.key))
+    } else {
+      parts.push(String(seg))
+    }
+  }
+  return parts.join('.') || '_'
+}
+
+/**
+ * Build the `{ key: string | string[] }` input that gets fed to the schema.
+ * Walks the URLSearchParams once; collisions promote a scalar to an array.
+ *
+ * Allocated lazily on `parse()` only — never paid by handlers that just read
+ * `ctx.query.get(...)`. Iteration of URLSearchParams is iteration-order stable
+ * and yields decoded values, so no manual percent-decoding here.
+ */
+function toShallowArrayObject(usp: URLSearchParams): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = Object.create(null)
+  for (const [k, v] of usp) {
+    const existing = out[k]
+    if (existing === undefined) {
+      out[k] = v
+    } else if (Array.isArray(existing)) {
+      existing.push(v)
+    } else {
+      out[k] = [existing, v]
+    }
+  }
+  return out
+}
+
+function makeRiftexQuery(raw: string): RiftexQuery {
+  const usp = new URLSearchParams(raw) as RiftexQuery
+  Object.defineProperty(usp, 'parse', {
+    configurable: true,
+    enumerable: false,
+    writable: false,
+    value: function parse<T>(
+      this: URLSearchParams,
+      schema: StandardSchemaV1<unknown, T> | SafeParseSchema<T> | ParseSchema<T>,
+    ): T {
+      const input = toShallowArrayObject(this)
+      // 1. Standard Schema v1 takes precedence.
+      if (isStandardSchema(schema)) {
+        const maybe = schema['~standard'].validate(input)
+        // Query parsing is synchronous — async validators are still accepted
+        // but throw a clearer error than awaiting at the wire would.
+        if (maybe instanceof Promise) {
+          throw new RiftexValidationError({
+            _: 'async Standard Schema validators are not supported on ctx.query.parse (use ctx.body.json for async)',
+          })
+        }
+        if (maybe.issues) {
+          const fields: Record<string, string> = {}
+          for (const issue of maybe.issues) {
+            fields[queryPathToField(issue.path)] = issue.message
+          }
+          throw new RiftexValidationError(fields)
+        }
+        return maybe.value as T
+      }
+      // 2. Zod-like safeParse.
+      if (
+        'safeParse' in schema &&
+        typeof (schema as SafeParseSchema<T>).safeParse === 'function'
+      ) {
+        const result = (schema as SafeParseSchema<T>).safeParse(input)
+        if (!result.success) {
+          const fields: Record<string, string> = {}
+          for (const issue of result.error.issues) {
+            fields[issue.path.join('.') || '_'] = issue.message
+          }
+          throw new RiftexValidationError(fields)
+        }
+        return result.data
+      }
+      // 3. Plain parse.
+      try {
+        return (schema as ParseSchema<T>).parse(input)
+      } catch (err) {
+        throw new RiftexValidationError({ _: (err as Error).message ?? 'validation failed' })
+      }
+    },
+  })
+  return usp
+}
+
 /** Internal response body shape — adapter writes one of these to the wire. */
 export type ResponseBody =
   | { kind: 'none' }
@@ -137,9 +262,9 @@ export class RiftexContext<Params = Record<string, string>> {
   queue!: <TData = unknown>(name: string) => import('../jobs/types.ts').JobHandle<TData>
 
   /** Lazy-parsed query. First access caches the URLSearchParams. */
-  private _query: URLSearchParams | null = null
-  get query(): URLSearchParams {
-    if (!this._query) this._query = new URLSearchParams(this.rawQuery)
+  private _query: RiftexQuery | null = null
+  get query(): RiftexQuery {
+    if (!this._query) this._query = makeRiftexQuery(this.rawQuery)
     return this._query
   }
 

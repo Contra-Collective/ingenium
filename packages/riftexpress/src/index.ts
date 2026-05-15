@@ -22,7 +22,7 @@ export { RiftexApp, type RiftexAppOptions, type RiftexErrorHandler, type RouteOp
 export { Router } from './router/router.ts'
 
 // ───── Context + Body ──────────────────────────────────────────────────────
-export { RiftexContext, type ResponseBody } from './context/context.ts'
+export { RiftexContext, type ResponseBody, type RiftexQuery } from './context/context.ts'
 export { RiftexBody, type ParseSchema, type SafeParseSchema } from './context/body.ts'
 export { RiftexContextPool } from './context/pool.ts'
 export type {

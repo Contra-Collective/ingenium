@@ -75,6 +75,53 @@ describe('e2e static: 304 If-None-Match', () => {
   })
 })
 
+describe('e2e static: 304 If-Modified-Since', () => {
+  it('returns 304 when If-Modified-Since is at or after Last-Modified', async () => {
+    const probe = await fetch(url('/hello.txt'))
+    const lastModified = probe.headers.get('last-modified')
+    expect(lastModified).toBeTruthy()
+    await probe.text()
+
+    const cached = await fetch(url('/hello.txt'), {
+      headers: { 'if-modified-since': lastModified! },
+    })
+    expect(cached.status).toBe(304)
+    const body = await cached.text()
+    expect(body).toBe('')
+  })
+
+  it('serves 200 when If-Modified-Since is older than Last-Modified', async () => {
+    // Date well in the past — file mtime is now-ish, so it must be newer.
+    const res = await fetch(url('/hello.txt'), {
+      headers: { 'if-modified-since': 'Wed, 01 Jan 2020 00:00:00 GMT' },
+    })
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('hello world\n')
+  })
+
+  it('If-None-Match takes precedence over If-Modified-Since (RFC 7232 §6)', async () => {
+    const probe = await fetch(url('/hello.txt'))
+    const etag = probe.headers.get('etag')
+    await probe.text()
+
+    // INM matches → 304, even if IMS is ancient and would say "modified".
+    const res = await fetch(url('/hello.txt'), {
+      headers: {
+        'if-none-match': etag!,
+        'if-modified-since': 'Wed, 01 Jan 2020 00:00:00 GMT',
+      },
+    })
+    expect(res.status).toBe(304)
+  })
+
+  it('malformed If-Modified-Since is ignored (serves 200)', async () => {
+    const res = await fetch(url('/hello.txt'), {
+      headers: { 'if-modified-since': 'not-a-date' },
+    })
+    expect(res.status).toBe(200)
+  })
+})
+
 describe('e2e static: 206 Range request', () => {
   it('returns partial body slice on a Range request', async () => {
     const res = await fetch(url('/data.bin'), {

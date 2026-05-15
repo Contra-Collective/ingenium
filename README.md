@@ -886,8 +886,7 @@ See [docs/roadmap.md](docs/roadmap.md) for the full breakdown. Highlights:
 - Compat shim long-tail: middleware that own `res.end` (compression, express-session) silently misbehave — documented but worth surfacing better
 - `ctx.query.parse(schema)` doesn't exist yet — only body validation has the schema affordance
 - `ExtractParams` doesn't narrow constrained params (`:id(\\d+)` stays `string`)
-- Static middleware doesn't honor `If-Modified-Since` (only `If-None-Match`)
-- HEAD requests on static files fall through to `next()` instead of returning headers-only
+- `ctx.query.parse(schema)` mirrors `ctx.body.json(schema)` but uses a fixed coercion model — see the [Schema validation](#schema-validation) section for the trade-offs
 
 **Deferred to next session:**
 - Plugin scoping (Fastify-style sub-app affinity)

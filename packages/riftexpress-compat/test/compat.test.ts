@@ -207,3 +207,61 @@ describe('expressCompat — known-broken detection', () => {
     }
   })
 })
+
+describe('expressCompat — res-shim monkey-patch traps', () => {
+  // These traps catch anonymous/wrapped versions of compression/express-session
+  // that slip past the name-based detection. They fire at REQUEST time when the
+  // wrapped middleware actually tries to monkey-patch res.write/res.end/res.pipe.
+
+  it('throws when a middleware assigns res.write (the compression pattern)', async () => {
+    const patcher = (_req: unknown, res: { write: unknown }, _next: () => void): void => {
+      res.write = (): void => {}
+    }
+    const wrapped = expressCompat(patcher)
+    const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+    await expect(wrapped(ctx, noopNext)).rejects.toThrow(/monkey-patch.*res\.write/)
+  })
+
+  it('throws when a middleware assigns res.end', async () => {
+    const patcher = (_req: unknown, res: { end: unknown }, _next: () => void): void => {
+      res.end = (): void => {}
+    }
+    const wrapped = expressCompat(patcher)
+    const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+    await expect(wrapped(ctx, noopNext)).rejects.toThrow(/monkey-patch.*res\.end/)
+  })
+
+  it('throws when a middleware assigns res.pipe', async () => {
+    const patcher = (_req: unknown, res: { pipe: unknown }, _next: () => void): void => {
+      res.pipe = (): void => {}
+    }
+    const wrapped = expressCompat(patcher)
+    const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+    await expect(wrapped(ctx, noopNext)).rejects.toThrow(/monkey-patch.*res\.pipe/)
+  })
+
+  it('reading res.write returns undefined (feature-detection still works)', async () => {
+    let observed: unknown = 'not-set'
+    const reader = (_req: unknown, res: { write: unknown }, next: () => void): void => {
+      observed = res.write
+      next()
+    }
+    const wrapped = expressCompat(reader)
+    const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+    await wrapped(ctx, noopNext)
+    expect(observed).toBeUndefined()
+  })
+
+  it('reading res.end returns the existing method (call site still works)', async () => {
+    let observed: unknown = null
+    const caller = (_req: unknown, res: { end: (chunk?: string) => unknown }, _next: () => void): void => {
+      observed = typeof res.end
+      res.end('ok')
+    }
+    const wrapped = expressCompat(caller)
+    const ctx = makeCtx({ method: 'GET', url: '/x', path: '/x' })
+    await wrapped(ctx, noopNext)
+    expect(observed).toBe('function')
+    expect(ctx._written).toBe(true)
+  })
+})

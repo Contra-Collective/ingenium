@@ -191,9 +191,23 @@ export function staticMiddleware(root: string, opts: StaticOptions = {}): Riftex
     ctx.set('content-type', mimeFor(target))
     ctx.set('accept-ranges', 'bytes')
 
-    // Conditional GET via If-None-Match.
+    // Conditional GET via If-None-Match (preferred) or If-Modified-Since
+    // (fallback per RFC 7232 §6). If-None-Match wins when both are present.
     const ifNoneMatch = ctx.headers['if-none-match']
-    if (typeof ifNoneMatch === 'string' && ifNoneMatch === etag) {
+    let notModified = typeof ifNoneMatch === 'string' && ifNoneMatch === etag
+
+    if (!notModified && !ifNoneMatch) {
+      const ifModifiedSince = ctx.headers['if-modified-since']
+      if (typeof ifModifiedSince === 'string') {
+        const sinceMs = Date.parse(ifModifiedSince)
+        // mtime is compared at second-resolution because HTTP-dates have no
+        // sub-second precision — Math.floor matches both sides.
+        const lastMs = Math.floor(stats.mtimeMs / 1000) * 1000
+        if (Number.isFinite(sinceMs) && lastMs <= sinceMs) notModified = true
+      }
+    }
+
+    if (notModified) {
       ctx.status(304)
       // 304 must not have a body.
       ctx._body = { kind: 'none' }
