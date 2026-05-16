@@ -33,12 +33,12 @@ calls `res.json()` and it should keep working, and (2) handlers sometimes
 need to set status/headers and return the body, which is awkward if the
 return is the only output channel.
 
-The reflection itself lives in `packages/riftexpress/src/response/reflect.ts`
+The reflection itself lives in `packages/ingenium/src/response/reflect.ts`
 and is invoked by the terminal middleware in `composeWithHandler` (see
 `middleware/compose.ts`):
 
 ```ts
-const terminal: RiftexMiddleware = async (ctx) => {
+const terminal: IngeniumMiddleware = async (ctx) => {
   const result = await handler(ctx)
   reflectReturn(ctx, result)
 }
@@ -95,7 +95,7 @@ Negative:
 - **Hono-style `Response` only.** Force handlers to construct and return a
   WHATWG `Response`. Clean model, future-proof for edge runtimes, but a
   hard break from Express muscle memory and forces wrapping for the 90%
-  case where the user just wants a JSON object. The `RiftexContext` design
+  case where the user just wants a JSON object. The `IngeniumContext` design
   also gives us per-request state and headers in one place; a `Response`
   return loses that.
 - **Koa-style `ctx.body = value`.** Halfway house — return value ignored,

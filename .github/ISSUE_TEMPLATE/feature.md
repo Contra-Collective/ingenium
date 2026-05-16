@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Propose a new capability or API for RiftExpress
+about: Propose a new capability or API for Ingenium
 title: "[feat] "
 labels: enhancement
 assignees: ""

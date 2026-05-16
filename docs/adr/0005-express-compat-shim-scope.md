@@ -4,7 +4,7 @@
 Accepted (2026-05-12)
 
 ## Context
-RiftExpress's pitch is "Express ergonomics, modern internals". A real
+Ingenium's pitch is "Express ergonomics, modern internals". A real
 Express user has years of muscle memory and an `app.use(cors())` line they
 copied from a tutorial. If that line throws, they bounce.
 
@@ -23,9 +23,9 @@ native ports" is.
 
 API.md gives us the levers:
 
-- `RiftexMiddleware` is `(ctx, next) => unknown | Promise<unknown>` — different
+- `IngeniumMiddleware` is `(ctx, next) => unknown | Promise<unknown>` — different
   shape from Express's `(req, res, next)`.
-- The shim's job is to take an Express middleware and produce a `RiftexMiddleware`
+- The shim's job is to take an Express middleware and produce a `IngeniumMiddleware`
   that bridges `req` → ctx.req and `res` → a thin object that proxies the
   Express response API to `ctx`.
 
@@ -35,13 +35,13 @@ The Express compat shim covers exactly this class of middleware:
 - **Stateless wrappers**: `cors`, `helmet`, `morgan`, `compression`,
   `serve-static`, `response-time`, `method-override`.
 - **Stateless body-affecting**: nothing — body parsing has its own native
-  path via `ctx.body.json()` etc., and the `riftex.json()` / `riftex.urlencoded()`
+  path via `ctx.body.json()` etc., and the `ingenium.json()` / `ingenium.urlencoded()`
   factories are no-op shims that exist purely so `app.use(express.json())`
   compiles (per API.md).
 
 The shim does **not** cover, and these need native ports:
 
-- **`multer`** — multipart parsing has to integrate with our `RiftexBody`
+- **`multer`** — multipart parsing has to integrate with our `IngeniumBody`
   streaming model, otherwise we get double-buffering or stream lifecycle
   bugs.
 - **`passport`** — the strategy lifecycle assumes Express's `req.login`,
@@ -56,9 +56,9 @@ The shim does **not** cover, and these need native ports:
   `req.originalUrl`, or `res.locals`** — these aren't Express features, they
   are Express *internals* that have leaked into ecosystem APIs.
 
-Shim location: a separate package (`@riftexpress/express-compat`) that
+Shim location: a separate package (`@ingenium/express-compat`) that
 re-exports a `fromExpress(mw)` function and ships pre-wrapped re-exports
-for the supported list. The core `riftexpress` package has zero awareness
+for the supported list. The core `ingenium` package has zero awareness
 of Express types.
 
 ## Consequences

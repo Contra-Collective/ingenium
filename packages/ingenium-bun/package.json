@@ -1,0 +1,30 @@
+{
+  "name": "ingenium-bun",
+  "version": "0.0.1",
+  "description": "Bun.serve transport adapter for Ingenium.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "keywords": ["bun", "http", "ingenium", "transport", "adapter"],
+  "license": "MIT",
+  "peerDependencies": {
+    "ingenium": "*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "vitest": "^2.0.0"
+  }
+}

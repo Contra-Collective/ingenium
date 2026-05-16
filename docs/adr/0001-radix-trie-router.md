@@ -5,7 +5,7 @@ Accepted (2026-05-12)
 
 ## Context
 Routing is the single hottest piece of code in any HTTP framework — it runs
-on every request, before any user logic. RiftExpress's contract (`API.md`)
+on every request, before any user logic. Ingenium's contract (`API.md`)
 guarantees:
 
 - Static segments win over `:param` over `*wild` (deterministic precedence).
@@ -34,7 +34,7 @@ We needed a router with these properties:
    dynamic code is forbidden.
 
 ## Decision
-Implement a hand-written radix trie (`packages/riftexpress/src/router/trie.ts`)
+Implement a hand-written radix trie (`packages/ingenium/src/router/trie.ts`)
 with three child slots per node: a `Map<string, TrieNode>` for static
 segments, a single `paramChild` slot, and a single `wildcardChild` slot. The
 matcher is iterative (no recursion, no allocation per segment except the
@@ -55,7 +55,7 @@ Positive:
   then `paramChild`, then `wildcardChild`. There is no precedence sort to get
   wrong, and no way for a user-registered route order to break it.
 - 405 with `Allow` header is one `Object.keys(node.handlers)` away — see
-  `app.handle` in `packages/riftexpress/src/app.ts` and the `MatchMiss` shape
+  `app.handle` in `packages/ingenium/src/app.ts` and the `MatchMiss` shape
   in `router/trie.ts`.
 - No runtime codegen → works under strict CSP and any future edge target.
 - The `EMPTY_PARAMS` frozen-object short-circuit saves one allocation per

@@ -1,9 +1,9 @@
 {
-  "name": "riftexpress-benchmarks",
+  "name": "ingenium-benchmarks",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Local regression benchmarks for RiftExpress vs Express/Fastify/Hono. NOT publishable performance claims.",
+  "description": "Local regression benchmarks for Ingenium vs Express/Fastify/Hono. NOT publishable performance claims.",
   "scripts": {
     "bench:hello": "tsx scenarios/hello.ts",
     "bench:body": "tsx scenarios/body-json.ts",
@@ -21,7 +21,7 @@
     "express": "^4.21.0",
     "fastify": "^5.0.0",
     "hono": "^4.6.0",
-    "riftexpress": "*",
+    "ingenium": "*",
     "tinybench": "^3.0.0"
   },
   "devDependencies": {

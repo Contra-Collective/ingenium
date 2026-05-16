@@ -5,20 +5,20 @@ The router is a radix trie matched at request time. Registrations are journaled,
 ## `Router()` — factory
 
 ```ts
-import { Router } from 'riftexpress'
-// or: const Router = riftex.Router
+import { Router } from 'ingenium'
+// or: const Router = ingenium.Router
 
 const router = Router()
 ```
 
-Constructs a fresh `Router`. Both `Router()` and `riftex.Router()` resolve to the same constructor. There is no required argument.
+Constructs a fresh `Router`. Both `Router()` and `ingenium.Router()` resolve to the same constructor. There is no required argument.
 
 ## `Router` instance API
 
 ```ts
 class Router {
-  use(mw: RiftexMiddleware): this
-  use(prefix: string, mw: RiftexMiddleware | Router): this
+  use(mw: IngeniumMiddleware): this
+  use(prefix: string, mw: IngeniumMiddleware | Router): this
 
   get(path, handler): this
   post(path, handler): this
@@ -28,11 +28,11 @@ class Router {
   head(path, handler): this
   options(path, handler): this
 
-  method(method: HttpMethod, path: string, handler: RiftexHandler): this
+  method(method: HttpMethod, path: string, handler: IngeniumHandler): this
 }
 ```
 
-`Router` has the same registration surface as `RiftexApp` — minus dispatch (`handle`, `listen`), plugin (`register`, `decorate`, `hooks`), and the error handler (`onError`). Routers are pure registration; the parent app owns runtime concerns.
+`Router` has the same registration surface as `IngeniumApp` — minus dispatch (`handle`, `listen`), plugin (`register`, `decorate`, `hooks`), and the error handler (`onError`). Routers are pure registration; the parent app owns runtime concerns.
 
 `use(prefix, value)` accepts either middleware or a sub-router. Throws `TypeError` for any other shape.
 
@@ -85,7 +85,7 @@ const HTTP_METHODS: readonly HttpMethod[] = [
 ] as const
 ```
 
-The string union and the corresponding readonly array. Both are exported from `'riftexpress'`. Useful for iterating every method when wiring per-method middleware or for typing `app.method(...)` arguments.
+The string union and the corresponding readonly array. Both are exported from `'ingenium'`. Useful for iterating every method when wiring per-method middleware or for typing `app.method(...)` arguments.
 
 ## `ExtractParams<Path>`
 

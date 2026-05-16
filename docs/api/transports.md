@@ -1,6 +1,6 @@
 # Transports
 
-A transport binds the RiftExpress dispatch loop to a concrete server runtime — `node:http`, Bun's `Bun.serve()`, `node:http2`, or anything else that produces a request and accepts a response. The default is `NodeAdapter`; override via `riftex({ transport: ... })`.
+A transport binds the Ingenium dispatch loop to a concrete server runtime — `node:http`, Bun's `Bun.serve()`, `node:http2`, or anything else that produces a request and accepts a response. The default is `NodeAdapter`; override via `ingenium({ transport: ... })`.
 
 ## `Transport` interface
 
@@ -17,9 +17,9 @@ interface Transport {
 
 ```ts
 interface TransportHooks {
-  acquire: () => RiftexContext
-  release: (ctx: RiftexContext) => void
-  dispatch: (ctx: RiftexContext) => Promise<void>
+  acquire: () => IngeniumContext
+  release: (ctx: IngeniumContext) => void
+  dispatch: (ctx: IngeniumContext) => Promise<void>
 }
 ```
 
@@ -31,7 +31,7 @@ A transport's per-request loop:
 4. Write `ctx._statusCode`, `ctx._headers`, `ctx._body` to the wire.
 5. `hooks.release(ctx)` — return to the pool (calls `reset()`).
 
-Implement your own transport if you need a runtime adapter that doesn't ship with RiftExpress.
+Implement your own transport if you need a runtime adapter that doesn't ship with Ingenium.
 
 ## `ListeningServer`
 
@@ -54,25 +54,25 @@ interface CloseOptions {
 ## `NodeAdapter` — default
 
 ```ts
-import { NodeAdapter } from 'riftexpress'
-const app = riftex({ transport: new NodeAdapter() })  // explicit; usually omitted
+import { NodeAdapter } from 'ingenium'
+const app = ingenium({ transport: new NodeAdapter() })  // explicit; usually omitted
 ```
 
-Wraps `node:http`. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to `RiftexContext`, and `RiftexContext` straight to `ServerResponse`. Default host: `'127.0.0.1'`.
+Wraps `node:http`. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to `IngeniumContext`, and `IngeniumContext` straight to `ServerResponse`. Default host: `'127.0.0.1'`.
 
 ---
 
-## `BunAdapter` — `riftexpress-bun`
+## `BunAdapter` — `ingenium-bun`
 
 ```ts
-import { riftex } from 'riftexpress'
-import { BunAdapter } from 'riftexpress-bun'
+import { ingenium } from 'ingenium'
+import { BunAdapter } from 'ingenium-bun'
 
-const app = riftex({ transport: new BunAdapter() })
+const app = ingenium({ transport: new BunAdapter() })
 await app.listen(3000)
 ```
 
-Wraps `Bun.serve()`. The adapter bridges WinterCG `Request`/`Response` ↔ `node:stream` so existing `RiftexBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called. Throws if the runtime is not Bun (`typeof Bun === 'undefined'`).
+Wraps `Bun.serve()`. The adapter bridges WinterCG `Request`/`Response` ↔ `node:stream` so existing `IngeniumBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called. Throws if the runtime is not Bun (`typeof Bun === 'undefined'`).
 
 Default host: `'127.0.0.1'`.
 
@@ -81,10 +81,10 @@ Default host: `'127.0.0.1'`.
 ## `Http2Adapter` — h2 (TLS)
 
 ```ts
-import { Http2Adapter } from 'riftexpress'
+import { Http2Adapter } from 'ingenium'
 import { readFileSync } from 'node:fs'
 
-const app = riftex({
+const app = ingenium({
   transport: new Http2Adapter({
     cert: readFileSync('cert.pem'),
     key:  readFileSync('key.pem'),
@@ -115,9 +115,9 @@ Default host: `'127.0.0.1'`.
 ## `Http2cAdapter` — h2c (cleartext)
 
 ```ts
-import { Http2cAdapter } from 'riftexpress'
+import { Http2cAdapter } from 'ingenium'
 
-const app = riftex({ transport: new Http2cAdapter() })
+const app = ingenium({ transport: new Http2cAdapter() })
 await app.listen(3000)
 ```
 
@@ -130,9 +130,9 @@ Constructor takes no required arguments. Default host: `'127.0.0.1'`.
 ## `WsNodeAdapter` — WebSocket-aware Node
 
 ```ts
-import { riftex, enableWebSockets } from 'riftexpress'
+import { ingenium, enableWebSockets } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 enableWebSockets(app)             // monkey-patches app.ws / app.upgradeWith and swaps in WsNodeAdapter
 
 app.ws('/echo', (sock) => {
@@ -147,14 +147,14 @@ await app.listen(3000)
 - `app.ws(path, handler, options?)` — register a WebSocket route. Uses `ws`'s `WebSocketServer({ noServer: true })` and hooks the `upgrade` event. Unknown paths get the socket destroyed cleanly.
 - `app.upgradeWith(integrator)` — hand the underlying `http.Server` to your own integrator (socket.io, custom upgrade handlers, etc.).
 
-`enableWebSockets` is idempotent — calling more than once on the same app is a no-op. Requires the `ws` peer dependency (`npm install ws @types/ws`); if a custom transport was injected via `RiftexAppOptions.transport`, the swap is skipped and a warning is emitted (you're responsible for calling the registrar's `attach()` from your transport).
+`enableWebSockets` is idempotent — calling more than once on the same app is a no-op. Requires the `ws` peer dependency (`npm install ws @types/ws`); if a custom transport was injected via `IngeniumAppOptions.transport`, the swap is skipped and a warning is emitted (you're responsible for calling the registrar's `attach()` from your transport).
 
 ---
 
 ## `gracefulShutdown(server, opts?)`
 
 ```ts
-import { gracefulShutdown } from 'riftexpress'
+import { gracefulShutdown } from 'ingenium'
 
 function gracefulShutdown(
   server: ListeningServer,

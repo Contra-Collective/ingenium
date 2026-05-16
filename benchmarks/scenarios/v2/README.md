@@ -7,7 +7,7 @@ with a methodology that is at least defensible as a *local regression detector*.
 
 1. **Separate child processes per framework.** Each framework's server runs in
    its own `node --experimental-strip-types` child process spawned by the
-   runner. v1 booted Express and RiftExpress in the same Node process, which
+   runner. v1 booted Express and Ingenium in the same Node process, which
    meant their V8 hidden classes, JIT caches, GC pressure, and module-init
    timing were entangled. The second framework was effectively benchmarking
    the steady-state of the first.
@@ -17,7 +17,7 @@ with a methodology that is at least defensible as a *local regression detector*.
    ~5% of the mean should not be quoted as a comparison.
 3. **Std-dev reported.** A delta smaller than 1 std-dev across runs is noise.
    The table makes that visible.
-4. **Four frameworks compared.** Express, Fastify, Hono, and RiftExpress.
+4. **Four frameworks compared.** Express, Fastify, Hono, and Ingenium.
    Comparing only against Express makes any "win" trivial; including Fastify
    and Hono prevents that.
 5. **Frameworks pinned at the versions in `benchmarks/package.json`.** v1

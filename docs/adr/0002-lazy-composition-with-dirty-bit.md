@@ -4,7 +4,7 @@
 Accepted (2026-05-12)
 
 ## Context
-RiftExpress separates *registration* (you call `app.use(...)` and `app.get(...)`)
+Ingenium separates *registration* (you call `app.use(...)` and `app.get(...)`)
 from *composition* (the framework walks the registration journal, figures out
 which middleware applies to which leaf route, and produces a single
 pre-bound async function per (method, path) tuple).
@@ -28,12 +28,12 @@ to discover, in production, that they accidentally registered a route too late.
 
 ## Decision
 Defer composition until the first request reaches `app.handle()`. Track a
-single `dirty: boolean` field on `RiftexApp` (see `packages/riftexpress/src/app.ts`).
-Set it `true` in the `RiftexApp` constructor and on every `use()`, `method()`,
+single `dirty: boolean` field on `IngeniumApp` (see `packages/ingenium/src/app.ts`).
+Set it `true` in the `IngeniumApp` constructor and on every `use()`, `method()`,
 `get()`/`post()`/etc. call. At the top of `handle()`:
 
 ```ts
-async handle(ctx: RiftexContext): Promise<void> {
+async handle(ctx: IngeniumContext): Promise<void> {
   if (this.dirty) this.compose()
   // ...
 }

@@ -1,10 +1,10 @@
-// RiftExpress: Hello-world server.
+// Ingenium: Hello-world server.
 // If you've used Express, this should look very familiar — same shape,
 // just a `ctx` object instead of `(req, res)` and async-aware return values.
 
-import { riftex, gracefulShutdown, type RiftexMiddleware } from 'riftexpress'
+import { ingenium, gracefulShutdown, type IngeniumMiddleware } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 
 // Decorator: lazily attach an app start time to every ctx (read once, cached).
 // Express equivalent: stash on `app.locals` and read manually in handlers.
@@ -12,7 +12,7 @@ app.decorateRequest('startedAt', () => Date.now())
 
 // Middleware: same `(ctx, next)` pattern Koa users will recognize.
 // Express equivalent: app.use((req, res, next) => { ...; next() })
-const logger: RiftexMiddleware = async (ctx, next) => {
+const logger: IngeniumMiddleware = async (ctx, next) => {
   await next()
   console.log(`${ctx.method} ${ctx.path} -> ${Date.now() - (ctx as any).startedAt}ms`)
 }
@@ -20,14 +20,14 @@ app.use(logger)
 
 // Static-file middleware. Drop assets in ./public and they'll be served at /.
 // Express equivalent: app.use(express.static('./public'))
-app.use(riftex.static('./public'))
+app.use(ingenium.static('./public'))
 
 // Health check — return value is reflected to the wire as JSON.
 app.use('/health', () => ({ ok: true }))
 
-// GET / — return a value, RiftExpress reflects it to the wire as JSON/text/html.
+// GET / — return a value, Ingenium reflects it to the wire as JSON/text/html.
 // Express equivalent: app.get('/', (req, res) => res.send('Hello'))
-app.get('/', () => 'Hello from RiftExpress')
+app.get('/', () => 'Hello from Ingenium')
 
 // GET /users/:id — params are typed via the path string.
 // Express equivalent: app.get('/users/:id', (req, res) => res.json({ id: req.params.id }))

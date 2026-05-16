@@ -2,7 +2,7 @@
 // Returns 200 with structured status; 503 if the DB ping fails so load
 // balancers can deroute the instance.
 
-import { Router } from 'riftexpress'
+import { Router } from 'ingenium'
 import type { DB } from '../db.ts'
 
 const VERSION = '0.0.1'

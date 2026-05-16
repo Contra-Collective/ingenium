@@ -1,9 +1,9 @@
 {
-  "name": "riftexpress-app-notes-api",
+  "name": "ingenium-app-notes-api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Reference RiftExpress application: a notes service with users, tags, and full-text search backed by SQLite.",
+  "description": "Reference Ingenium application: a notes service with users, tags, and full-text search backed by SQLite.",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
@@ -14,7 +14,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "riftexpress": "*",
+    "ingenium": "*",
     "better-sqlite3": "^11.5.0",
     "zod": "^3.23.0",
     "pino": "^9.5.0"

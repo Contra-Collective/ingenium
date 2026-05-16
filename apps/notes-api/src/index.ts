@@ -7,12 +7,12 @@
 
 import { pathToFileURL } from 'node:url'
 import {
-  riftex,
-  RiftexNotFoundError,
-  RiftexUnauthorizedError,
-  RiftexValidationError,
-  type RiftexApp,
-} from 'riftexpress'
+  ingenium,
+  IngeniumNotFoundError,
+  IngeniumUnauthorizedError,
+  IngeniumValidationError,
+  type IngeniumApp,
+} from 'ingenium'
 import { loadConfig, type AppConfig } from './config.ts'
 import { openDatabase, type DB } from './db.ts'
 import { authPlugin } from './auth.ts'
@@ -28,8 +28,8 @@ export interface BuildAppOptions {
   logger: Logger
 }
 
-export async function buildApp(opts: BuildAppOptions): Promise<RiftexApp> {
-  const app = riftex()
+export async function buildApp(opts: BuildAppOptions): Promise<IngeniumApp> {
+  const app = ingenium()
 
   await app.register(loggerPlugin, { logger: opts.logger })
   await app.register(authPlugin, { db: opts.db })
@@ -38,19 +38,19 @@ export async function buildApp(opts: BuildAppOptions): Promise<RiftexApp> {
   // useful status codes, but never leak stack traces. Unknowns are logged
   // with full context and surfaced as a generic 500.
   app.onError((err, ctx) => {
-    if (err instanceof RiftexValidationError) {
+    if (err instanceof IngeniumValidationError) {
       ctx.json({ error: err.message, code: err.code, fields: err.fields }, 422)
       return
     }
-    if (err instanceof RiftexUnauthorizedError) {
+    if (err instanceof IngeniumUnauthorizedError) {
       ctx.json({ error: err.message, code: err.code }, 401)
       return
     }
-    if (err instanceof RiftexNotFoundError) {
+    if (err instanceof IngeniumNotFoundError) {
       ctx.json({ error: err.message, code: err.code }, 404)
       return
     }
-    // Other RiftexErrors (e.g. RiftexBadRequestError) — honor their statusCode.
+    // Other IngeniumErrors (e.g. IngeniumBadRequestError) — honor their statusCode.
     if (err instanceof Error && 'statusCode' in err && typeof err.statusCode === 'number') {
       const code = (err as { code?: string }).code ?? 'ERROR'
       ctx.json({ error: err.message, code }, err.statusCode)

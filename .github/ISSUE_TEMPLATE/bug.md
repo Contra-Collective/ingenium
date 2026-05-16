@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a defect in RiftExpress
+about: Report a defect in Ingenium
 title: "[bug] "
 labels: bug
 assignees: ""
@@ -24,8 +24,8 @@ assignees: ""
 
 ## Environment
 
-- RiftExpress version:
-- Package (riftexpress / riftexpress-compat / riftexpress-bun / riftexpress-cli):
+- Ingenium version:
+- Package (ingenium / ingenium-compat / ingenium-bun / ingenium-cli):
 - Node.js version (`node -v`):
 - Bun version (if applicable, `bun -v`):
 - OS and version:

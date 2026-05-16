@@ -1,17 +1,17 @@
-# `riftexpress-cli`
+# `ingenium-cli`
 
-Project scaffolder. Zero runtime dependencies — only Node built-ins. Lives in [`packages/riftexpress-cli`](../../packages/riftexpress-cli).
+Project scaffolder. Zero runtime dependencies — only Node built-ins. Lives in [`packages/ingenium-cli`](../../packages/ingenium-cli).
 
 ## Install
 
 ```sh
-npm install -g riftexpress-cli
+npm install -g ingenium-cli
 ```
 
 Or run on demand without installing:
 
 ```sh
-npx riftexpress-cli new my-api
+npx ingenium-cli new my-api
 ```
 
 **Requires Node 22+** — the CLI runs `.ts` sources via `--experimental-strip-types`.
@@ -19,25 +19,25 @@ npx riftexpress-cli new my-api
 ## Usage
 
 ```sh
-riftex new <name> [--bun] [--minimal] [--force]
-riftex routes
-riftex --version
-riftex --help
+ingenium new <name> [--bun] [--minimal] [--force]
+ingenium routes
+ingenium --version
+ingenium --help
 ```
 
-### `riftex new <name>`
+### `ingenium new <name>`
 
-Scaffold a new RiftExpress project at `./<name>`.
+Scaffold a new Ingenium project at `./<name>`.
 
 | Flag | Effect |
 |---|---|
 | `--minimal` | Bare hello-world template (10-line `src/index.ts`). |
-| `--bun` | Bun.serve adapter template (`riftexpress-bun`). |
+| `--bun` | Bun.serve adapter template (`ingenium-bun`). |
 | `--force` | Overwrite an existing directory at the target path. |
 
 Without `--bun` or `--minimal`, the default template is used.
 
-Templates available (in `packages/riftexpress-cli/src/templates/`):
+Templates available (in `packages/ingenium-cli/src/templates/`):
 
 - `default` — full skeleton: `package.json`, `tsconfig.json`, `.gitignore`, `src/index.ts`, `README.md`.
 - `minimal` — same skeleton with a tiny hello-world `src/index.ts`.
@@ -45,15 +45,15 @@ Templates available (in `packages/riftexpress-cli/src/templates/`):
 
 Argv is parsed by hand — `--key` and `-k` are both flag-only (no values consumed), and the first non-flag argument is the command, with the rest accumulated as positionals.
 
-### `riftex routes`
+### `ingenium routes`
 
 Placeholder in v0.0.1 — prints a "not implemented" notice. Will print the registered route table once the route-introspection API ships.
 
-### `riftex --version` / `riftex -v`
+### `ingenium --version` / `ingenium -v`
 
 Prints the CLI version (read from its own `package.json`).
 
-### `riftex --help` / `riftex -h`
+### `ingenium --help` / `ingenium -h`
 
 Prints the help banner.
 
@@ -68,10 +68,10 @@ Prints the help banner.
 ## Examples
 
 ```sh
-riftex new my-api                      # default template
-riftex new my-bun-api --bun            # Bun.serve adapter
-riftex new tiny --minimal              # minimal hello-world
-riftex new my-api --force              # overwrite existing dir
+ingenium new my-api                      # default template
+ingenium new my-bun-api --bun            # Bun.serve adapter
+ingenium new tiny --minimal              # minimal hello-world
+ingenium new my-api --force              # overwrite existing dir
 ```
 
 After scaffolding, the CLI prints `Next steps:` with the conventional three-line `cd / npm install / npm run dev` instructions.

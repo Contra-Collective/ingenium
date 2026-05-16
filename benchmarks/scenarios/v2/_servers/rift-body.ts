@@ -1,6 +1,6 @@
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 app.post('/echo', async (ctx) => {
   const body = await ctx.body.json<{ name?: string }>()
   return { name: body?.name, processedAt: Date.now() }

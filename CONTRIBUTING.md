@@ -1,4 +1,4 @@
-# Contributing to RiftExpress
+# Contributing to Ingenium
 
 Thanks for your interest in contributing. This guide covers everything you
 need to know to land a change in the repository.
@@ -15,8 +15,8 @@ channel.
 ## Getting set up
 
 ```sh
-git clone https://github.com/riftexpress/riftexpress.git
-cd riftexpress
+git clone https://github.com/ingenium/ingenium.git
+cd ingenium
 npm install
 npm test
 npm run typecheck
@@ -26,7 +26,7 @@ Requirements:
 
 - **Node.js >= 20.** CI runs against 20, 22, and 24.
 - **Bun >= 1.1** is optional — only required if you're touching
-  `packages/riftexpress-bun`.
+  `packages/ingenium-bun`.
 - npm 10+ (ships with Node 20.5+).
 
 ## Repo structure
@@ -35,10 +35,10 @@ This is a workspaces monorepo:
 
 | Path                          | Purpose                                                     |
 | ----------------------------- | ----------------------------------------------------------- |
-| `packages/riftexpress`        | Core framework — `riftex()`, `Router`, `RiftexContext`, plugins   |
-| `packages/riftexpress-compat` | `expressCompat(mw)` shim for `(req, res, next)` middleware  |
-| `packages/riftexpress-bun`    | `BunAdapter` transport for `Bun.serve()`                    |
-| `packages/riftexpress-cli`    | `riftex new` project scaffolder                                |
+| `packages/ingenium`        | Core framework — `ingenium()`, `Router`, `IngeniumContext`, plugins   |
+| `packages/ingenium-compat` | `expressCompat(mw)` shim for `(req, res, next)` middleware  |
+| `packages/ingenium-bun`    | `BunAdapter` transport for `Bun.serve()`                    |
+| `packages/ingenium-cli`    | `ingenium new` project scaffolder                                |
 | `examples/*`                  | Runnable examples — `basic`, `migrate-from-express`, etc.   |
 | `apps/*`                      | Internal apps used during development                       |
 | `benchmarks/`                 | Comparative throughput harness vs Express, Hono, Fastify    |

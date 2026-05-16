@@ -1,19 +1,19 @@
 # Production deployment
 
-RiftExpress is intentionally minimal at the network edge: it does not terminate TLS, run as a process supervisor, or ship its own observability layer. The job of the surrounding stack is to handle those things, and the framework is designed to slot in cleanly behind a reverse proxy.
+Ingenium is intentionally minimal at the network edge: it does not terminate TLS, run as a process supervisor, or ship its own observability layer. The job of the surrounding stack is to handle those things, and the framework is designed to slot in cleanly behind a reverse proxy.
 
-This guide covers the patterns we recommend for production. Examples assume `riftexpress` v0.1.0-alpha and Node 22+.
+This guide covers the patterns we recommend for production. Examples assume `ingenium` v0.1.0-alpha and Node 22+.
 
 ---
 
 ## Behind nginx
 
-Recommended for self-hosted deployments. Nginx terminates TLS, sets `X-Forwarded-*` headers, and proxies to RiftExpress over a Unix socket or `127.0.0.1`.
+Recommended for self-hosted deployments. Nginx terminates TLS, sets `X-Forwarded-*` headers, and proxies to Ingenium over a Unix socket or `127.0.0.1`.
 
 ```nginx
-upstream riftex_app {
+upstream ingenium_app {
   server 127.0.0.1:3000 keepalive 32;
-  # or: server unix:/var/run/riftex.sock;
+  # or: server unix:/var/run/ingenium.sock;
   keepalive_timeout 60s;
 }
 
@@ -25,7 +25,7 @@ server {
   ssl_certificate_key /etc/letsencrypt/live/app.example.com/privkey.pem;
 
   location / {
-    proxy_pass http://riftex_app;
+    proxy_pass http://ingenium_app;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
     proxy_set_header Host $host;
@@ -41,7 +41,7 @@ server {
 Match in your app:
 
 ```ts
-const app = riftex({ trustProxy: 'loopback' })
+const app = ingenium({ trustProxy: 'loopback' })
 ```
 
 `'loopback'` trusts `127.0.0.0/8` and `::1` — exactly the nginx-on-localhost case. `ctx.ip`, `ctx.protocol`, and `ctx.hostname` will then reflect the original client.
@@ -69,10 +69,10 @@ CDNs sit on public IPs you don't control. `'loopback'` and `'uniquelocal'` keywo
 ```ts
 // Option 1: trust the entire chain (simplest, fine if your origin is firewalled
 // to only accept connections from the CDN).
-const app = riftex({ trustProxy: true })
+const app = ingenium({ trustProxy: true })
 
 // Option 2: explicitly list the CDN's published IP ranges.
-const app = riftex({
+const app = ingenium({
   trustProxy: [
     '173.245.48.0/20',  // Cloudflare ranges (example — pull current list from CDN docs)
     '103.21.244.0/22',
@@ -81,7 +81,7 @@ const app = riftex({
 })
 
 // Option 3: predicate-based (e.g. integrate with a service-discovery feed).
-const app = riftex({
+const app = ingenium({
   trustProxy: (ip, hopIdx) => isKnownEdgeIp(ip),
 })
 ```
@@ -169,7 +169,7 @@ Boot:
 
 ```ts
 const cfg = loadConfig()
-const app = riftex({ trustProxy: 'loopback' })
+const app = ingenium({ trustProxy: 'loopback' })
 const server = await app.listen(cfg.PORT, cfg.HOST)
 ```
 
@@ -180,9 +180,9 @@ const server = await app.listen(cfg.PORT, cfg.HOST)
 Wire `gracefulShutdown` after `listen()`. Without it, SIGTERM kills the server immediately and in-flight requests are dropped.
 
 ```ts
-import { riftex, gracefulShutdown } from 'riftexpress'
+import { ingenium, gracefulShutdown } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 const server = await app.listen(cfg.PORT, cfg.HOST)
 
 gracefulShutdown(server, {
@@ -210,19 +210,19 @@ For Kubernetes set `terminationGracePeriodSeconds: 30` (or larger than your `gra
 
 ## Observability
 
-RiftExpress doesn't ship a logger; bring your own. The plugin pattern below gives you per-request structured logs with request IDs.
+Ingenium doesn't ship a logger; bring your own. The plugin pattern below gives you per-request structured logs with request IDs.
 
 ```ts
 import pino from 'pino'
-import { riftex, type RiftexPlugin } from 'riftexpress'
+import { ingenium, type IngeniumPlugin } from 'ingenium'
 import { randomUUID } from 'node:crypto'
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' })
 
-const observability: RiftexPlugin = (app) => {
+const observability: IngeniumPlugin = (app) => {
   app.decorateRequest('reqId', () => randomUUID())
   app.decorateRequest('log', (ctx) =>
-    logger.child({ reqId: (ctx as RiftexContext & { reqId: string }).reqId })
+    logger.child({ reqId: (ctx as IngeniumContext & { reqId: string }).reqId })
   )
 
   app.hooks.onRequest((ctx) => {
@@ -231,7 +231,7 @@ const observability: RiftexPlugin = (app) => {
   })
 
   app.hooks.onResponse((ctx) => {
-    const log = (ctx as RiftexContext & { log: pino.Logger }).log
+    const log = (ctx as IngeniumContext & { log: pino.Logger }).log
     const ms = Date.now() - (ctx.state as { _start: number })._start
     log.info({
       method: ctx.method, path: ctx.path, status: ctx._statusCode, ms,
@@ -239,7 +239,7 @@ const observability: RiftexPlugin = (app) => {
   })
 
   app.hooks.onError((err, ctx) => {
-    const log = (ctx as RiftexContext & { log: pino.Logger }).log
+    const log = (ctx as IngeniumContext & { log: pino.Logger }).log
     log.error({ err, method: ctx.method, path: ctx.path }, 'unhandled')
   })
 }
@@ -253,15 +253,15 @@ OpenTelemetry: there isn't a first-party instrumentation yet. The plugin lifecyc
 
 ## HTTPS
 
-RiftExpress does not terminate TLS in core. Two paths:
+Ingenium does not terminate TLS in core. Two paths:
 
-1. **Reverse proxy (recommended).** nginx, Caddy, Cloudflare, fly.io, Vercel — they all do TLS better than a Node process can. Run RiftExpress on plain HTTP behind them.
+1. **Reverse proxy (recommended).** nginx, Caddy, Cloudflare, fly.io, Vercel — they all do TLS better than a Node process can. Run Ingenium on plain HTTP behind them.
 2. **Direct via Http2Adapter.** When you need ALPN HTTP/2 end-to-end without an intermediate proxy, use `Http2Adapter`:
    ```ts
-   import { riftex, Http2Adapter } from 'riftexpress'
+   import { ingenium, Http2Adapter } from 'ingenium'
    import { readFileSync } from 'node:fs'
 
-   const app = riftex({
+   const app = ingenium({
      transport: new Http2Adapter({
        cert: readFileSync('/etc/ssl/cert.pem'),
        key:  readFileSync('/etc/ssl/key.pem'),
@@ -279,17 +279,17 @@ RiftExpress does not terminate TLS in core. Two paths:
 ### systemd unit
 
 ```ini
-# /etc/systemd/system/riftex.service
+# /etc/systemd/system/ingenium.service
 [Unit]
-Description=RiftExpress app
+Description=Ingenium app
 After=network.target
 
 [Service]
 Type=simple
 User=node
-WorkingDirectory=/opt/riftex
+WorkingDirectory=/opt/ingenium
 Environment="NODE_ENV=production"
-EnvironmentFile=/etc/riftex/env
+EnvironmentFile=/etc/ingenium/env
 ExecStart=/usr/bin/node --experimental-strip-types src/index.ts
 Restart=on-failure
 RestartSec=2
@@ -303,7 +303,7 @@ WantedBy=multi-user.target
 ### PM2
 
 ```sh
-pm2 start src/index.ts --name riftex \
+pm2 start src/index.ts --name ingenium \
   --interpreter node \
   --interpreter-args="--experimental-strip-types" \
   --kill-timeout 15000
@@ -315,19 +315,19 @@ pm2 start src/index.ts --name riftex \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: riftex
+  name: ingenium
 spec:
   replicas: 3
-  selector: { matchLabels: { app: riftex } }
+  selector: { matchLabels: { app: ingenium } }
   template:
-    metadata: { labels: { app: riftex } }
+    metadata: { labels: { app: ingenium } }
     spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: app
-          image: my-registry/riftex:latest
+          image: my-registry/ingenium:latest
           ports: [{ containerPort: 3000 }]
-          envFrom: [{ secretRef: { name: riftex-env } }]
+          envFrom: [{ secretRef: { name: ingenium-env } }]
           readinessProbe:
             httpGet: { path: /api/health, port: 3000 }
             periodSeconds: 5
@@ -341,15 +341,15 @@ spec:
 
 ## Pre-flight checklist
 
-Before pushing a RiftExpress app to production, verify:
+Before pushing a Ingenium app to production, verify:
 
 - [ ] `trustProxy` set correctly for your edge (loopback / CIDR list / `true`)
 - [ ] `gracefulShutdown(server, { gracefulTimeoutMs })` wired after `listen()`
 - [ ] `sessionMiddleware` (if used) has rotated `secret: [...]` from a secrets manager
-- [ ] `riftex.csrf({ secret })` enabled for any cookie-authenticated mutating routes
-- [ ] `riftex.cors({ origin })` configured to your actual allowed origins (no `'*'` with credentials)
-- [ ] `riftex.rateLimit({ windowMs, limit })` on auth endpoints at minimum
-- [ ] `riftex.static(...)` is NOT being used to serve user-uploaded content from a public directory unsanitized
+- [ ] `ingenium.csrf({ secret })` enabled for any cookie-authenticated mutating routes
+- [ ] `ingenium.cors({ origin })` configured to your actual allowed origins (no `'*'` with credentials)
+- [ ] `ingenium.rateLimit({ windowMs, limit })` on auth endpoints at minimum
+- [ ] `ingenium.static(...)` is NOT being used to serve user-uploaded content from a public directory unsanitized
 - [ ] Body size limits are appropriate for each endpoint (`ctx.body.json(schema, maxBytes)`)
 - [ ] Error handler logs server-side context but does not leak stack traces to clients
 - [ ] Health endpoint exists and is exempt from rate-limiting + CSRF

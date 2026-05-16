@@ -13,9 +13,9 @@
 //              curl -i http://localhost:3000/admin/secret    # admin-only mw
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 
 app.use(async (ctx, next) => {
   ctx.state.startedAt = Date.now()

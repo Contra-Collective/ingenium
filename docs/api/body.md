@@ -1,9 +1,9 @@
-# `RiftexBody` — `ctx.body`
+# `IngeniumBody` — `ctx.body`
 
-The lazy body accessor. One instance per `RiftexContext` (pool-bound), so the per-request cost is just a `_reset()`. The adapter attaches the request stream, content-type, and content-length on every request; nothing is read until you call a parser.
+The lazy body accessor. One instance per `IngeniumContext` (pool-bound), so the per-request cost is just a `_reset()`. The adapter attaches the request stream, content-type, and content-length on every request; nothing is read until you call a parser.
 
 ```ts
-class RiftexBody {
+class IngeniumBody {
   json<T>(schema?, maxBytes?): Promise<T>
   text(maxBytes?): Promise<string>
   urlencoded(maxBytes?): Promise<Record<string, string>>
@@ -49,12 +49,12 @@ const C = { parse(x: unknown) { /* ... */ return x as { name: string } } }
 const c = await ctx.body.json(C)
 ```
 
-Validation failures throw `RiftexValidationError` with a `fields: Record<string, string>` map. Standard Schema and Zod paths are dot-joined (`['user','email']` → `'user.email'`); the empty path becomes `'_'`.
+Validation failures throw `IngeniumValidationError` with a `fields: Record<string, string>` map. Standard Schema and Zod paths are dot-joined (`['user','email']` → `'user.email'`); the empty path becomes `'_'`.
 
 Throws:
-- `RiftexBadRequestError` — invalid JSON.
-- `RiftexValidationError` — schema rejected the parsed value.
-- `RiftexPayloadTooLargeError` — body exceeded `maxBytes`.
+- `IngeniumBadRequestError` — invalid JSON.
+- `IngeniumValidationError` — schema rejected the parsed value.
+- `IngeniumPayloadTooLargeError` — body exceeded `maxBytes`.
 
 ## `text(maxBytes?)`
 
@@ -80,7 +80,7 @@ buffer(maxBytes?: number): Promise<Buffer>
 
 Buffer the entire body into a single `Buffer`. Default `maxBytes`: 100,000.
 
-The implementation short-circuits when `Content-Length` already exceeds `maxBytes` — in that case the source is drained (so the connection can be reused) and `RiftexPayloadTooLargeError` is thrown without buffering anything. Otherwise the body is piped through a byte-counting limit stream that throws mid-stream if the cap is exceeded.
+The implementation short-circuits when `Content-Length` already exceeds `maxBytes` — in that case the source is drained (so the connection can be reused) and `IngeniumPayloadTooLargeError` is thrown without buffering anything. Otherwise the body is piped through a byte-counting limit stream that throws mid-stream if the cap is exceeded.
 
 If the request had no body, returns `Buffer.alloc(0)`.
 
@@ -90,7 +90,7 @@ If the request had no body, returns `Buffer.alloc(0)`.
 stream(): Readable
 ```
 
-Hand back the raw `node:stream` `Readable`. Throws `RiftexBadRequestError` if the body has already been consumed by another parser, or if the request has no body. After calling `stream()`, you own the bytes — no other parser will read them.
+Hand back the raw `node:stream` `Readable`. Throws `IngeniumBadRequestError` if the body has already been consumed by another parser, or if the request has no body. After calling `stream()`, you own the bytes — no other parser will read them.
 
 ```ts
 app.post('/upload', async (ctx) => {
@@ -146,8 +146,8 @@ interface MultipartResult {
 
 | Throw | Cause |
 |---|---|
-| `RiftexPayloadTooLargeError` | Body exceeds `maxBytes`, OR a single file exceeds `maxFileSize`. |
-| `RiftexBadRequestError` | Too many files / fields, disallowed MIME prefix, missing/wrong `Content-Type`, missing boundary, malformed body. |
+| `IngeniumPayloadTooLargeError` | Body exceeds `maxBytes`, OR a single file exceeds `maxFileSize`. |
+| `IngeniumBadRequestError` | Too many files / fields, disallowed MIME prefix, missing/wrong `Content-Type`, missing boundary, malformed body. |
 
 ## Schema types
 
@@ -162,4 +162,4 @@ interface SafeParseSchema<T> {
 }
 ```
 
-Both are exported as `ParseSchema` and `SafeParseSchema` from `'riftexpress'`. See [schema.md](./schema.md) for the Standard Schema v1 surface (`StandardSchemaV1`, `isStandardSchema`, etc.).
+Both are exported as `ParseSchema` and `SafeParseSchema` from `'ingenium'`. See [schema.md](./schema.md) for the Standard Schema v1 surface (`StandardSchemaV1`, `isStandardSchema`, etc.).

@@ -10,7 +10,7 @@ If you experience or witness unacceptable behavior, report it privately to the m
 
 ## Scope
 
-Applies to all project spaces — issues, pull requests, code review comments, discussion threads, the wiki, and any RiftExpress-affiliated chat or event — and to public spaces when an individual is representing the project.
+Applies to all project spaces — issues, pull requests, code review comments, discussion threads, the wiki, and any Ingenium-affiliated chat or event — and to public spaces when an individual is representing the project.
 
 ## Enforcement
 

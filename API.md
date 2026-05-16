@@ -1,4 +1,4 @@
-# RiftExpress Public API Contract (v0.0.1)
+# Ingenium Public API Contract (v0.0.1)
 
 This is the locked public API for downstream code (tests, compat shim, examples, benchmarks, docs). If you find a gap in this spec while implementing, **stop and ask**, do not invent an API.
 
@@ -6,31 +6,31 @@ This is the locked public API for downstream code (tests, compat shim, examples,
 
 ```ts
 import {
-  riftex,                       // function: creates RiftexApp
+  ingenium,                       // function: creates IngeniumApp
   Router,                    // function: creates a mountable Router
-  RiftexContext,                // class
-  RiftexBody,                   // class (on ctx.body)
-  RiftexError,
-  RiftexNotFoundError,
-  RiftexUnauthorizedError,
-  RiftexMethodNotAllowedError,
-  RiftexPayloadTooLargeError,
-  RiftexValidationError,
-  RiftexBadRequestError,
-  type RiftexHandler,
-  type RiftexMiddleware,
+  IngeniumContext,                // class
+  IngeniumBody,                   // class (on ctx.body)
+  IngeniumError,
+  IngeniumNotFoundError,
+  IngeniumUnauthorizedError,
+  IngeniumMethodNotAllowedError,
+  IngeniumPayloadTooLargeError,
+  IngeniumValidationError,
+  IngeniumBadRequestError,
+  type IngeniumHandler,
+  type IngeniumMiddleware,
   type ExtractParams,
   type HttpMethod,
-} from 'riftexpress'
+} from 'ingenium'
 ```
 
 ## App
 
 ```ts
-const app = riftex({ poolSize?: number })
+const app = ingenium({ poolSize?: number })
 
-app.use(mw: RiftexMiddleware): this
-app.use(mountPath: string, mw: RiftexMiddleware | Router): this
+app.use(mw: IngeniumMiddleware): this
+app.use(mountPath: string, mw: IngeniumMiddleware | Router): this
 
 app.get(path, handler)
 app.post(path, handler)
@@ -40,14 +40,14 @@ app.delete(path, handler)
 app.head(path, handler)
 app.options(path, handler)
 
-app.onError((err: unknown, ctx: RiftexContext) => unknown | Promise<unknown>): this
+app.onError((err: unknown, ctx: IngeniumContext) => unknown | Promise<unknown>): this
 app.compose(): void                       // explicit pre-warm; auto-runs lazily on first request
-app.handle(ctx: RiftexContext): Promise<void>  // dispatch entry, used by adapters
+app.handle(ctx: IngeniumContext): Promise<void>  // dispatch entry, used by adapters
 app.listen(port: number, host?: string): Promise<{ port: number; close: () => Promise<void> }>
 
 // Built-in middleware (no install required):
-riftex.json(opts?:    { limit?: number }): RiftexMiddleware     // sets ctx.body parsing default
-riftex.urlencoded(opts?: { limit?: number }): RiftexMiddleware
+ingenium.json(opts?:    { limit?: number }): IngeniumMiddleware     // sets ctx.body parsing default
+ingenium.urlencoded(opts?: { limit?: number }): IngeniumMiddleware
 // Note: these are zero-cost no-ops in v0.0.1 — body parsing is lazy via
 // `ctx.body.json()` / `ctx.body.urlencoded()`. Provided for Express
 // migration ergonomics so existing `app.use(express.json())` lines compile.
@@ -64,10 +64,10 @@ r.use(mountPath, mw | Router)
 app.use('/api', r)           // mounts at /api — routes inside r get the prefix
 ```
 
-## RiftexContext
+## IngeniumContext
 
 ```ts
-class RiftexContext<Params = Record<string, string>> {
+class IngeniumContext<Params = Record<string, string>> {
   // Request
   method: HttpMethod
   url: string                 // path + ?query
@@ -76,7 +76,7 @@ class RiftexContext<Params = Record<string, string>> {
   query: URLSearchParams      // lazy parsed
   params: Params
   headers: IncomingHttpHeaders
-  body: RiftexBody
+  body: IngeniumBody
   state: Record<string, unknown>  // free-form per-request scratch
 
   // Response setters (chainable: status, set/setHeader)
@@ -95,10 +95,10 @@ class RiftexContext<Params = Record<string, string>> {
 }
 ```
 
-## RiftexBody
+## IngeniumBody
 
 ```ts
-class RiftexBody {
+class IngeniumBody {
   json<T>(schema?: ZodLikeSchema<T>, maxBytes?: number): Promise<T>
   text(maxBytes?: number): Promise<string>
   urlencoded(maxBytes?: number): Promise<Record<string, string>>
@@ -106,14 +106,14 @@ class RiftexBody {
   stream(): Readable                                    // raw node:stream Readable
 }
 // Schema may be Zod (uses safeParse) or any { parse(input): T } compatible.
-// Validation failure throws RiftexValidationError with field-level `fields`.
+// Validation failure throws IngeniumValidationError with field-level `fields`.
 ```
 
 ## Middleware
 
 ```ts
-type RiftexMiddleware = (ctx: RiftexContext, next: () => Promise<void>) => unknown | Promise<unknown>
-type RiftexHandler<P = Record<string, string>> = (ctx: RiftexContext<P>) => unknown | Promise<unknown>
+type IngeniumMiddleware = (ctx: IngeniumContext, next: () => Promise<void>) => unknown | Promise<unknown>
+type IngeniumHandler<P = Record<string, string>> = (ctx: IngeniumContext<P>) => unknown | Promise<unknown>
 ```
 
 Handler return values are reflected to the wire:
@@ -127,7 +127,7 @@ Handler return values are reflected to the wire:
 
 ## Errors
 
-All extend `RiftexError`. Default boundary serializes:
+All extend `IngeniumError`. Default boundary serializes:
 ```json
 { "error": "<message>", "code": "<CODE>", "fields"?: { ... } }
 ```
@@ -151,8 +151,8 @@ All extend `RiftexError`. Default boundary serializes:
 ## Files an agent MAY NOT touch
 
 These are owned by the main thread:
-- `packages/riftexpress/src/**`  (core sources)
-- `packages/riftexpress/package.json`, `tsconfig.json`, `tsup.config.ts`
+- `packages/ingenium/src/**`  (core sources)
+- `packages/ingenium/package.json`, `tsconfig.json`, `tsup.config.ts`
 - root `package.json`, `tsconfig.base.json`, `tsconfig.json`, `vitest.config.ts`
 - `API.md` (this file)
 

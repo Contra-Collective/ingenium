@@ -1,12 +1,12 @@
 # Plugins
 
-RiftExpress ships a minimal plugin system: a plugin is a function that mutates
+Ingenium ships a minimal plugin system: a plugin is a function that mutates
 an app, and plugins compose via lifecycle hooks and per-request decorators.
 
 ## Plugin signature
 
 ```ts
-type RiftexPlugin<O = void> = (app: RiftexApp, opts: O) => void | Promise<void>
+type IngeniumPlugin<O = void> = (app: IngeniumApp, opts: O) => void | Promise<void>
 
 await app.register(myPlugin, opts)   // when the plugin requires options
 await app.register(myPlugin)         // when the plugin takes no options
@@ -60,8 +60,8 @@ plugin path entirely (`hasAny()` short-circuits) — zero overhead on the hot pa
 To make decorated values appear in TypeScript intellisense:
 
 ```ts
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     user: User
     requireAuth: () => void
   }
@@ -71,12 +71,12 @@ declare module 'riftexpress' {
 ## Example: auth plugin
 
 ```ts
-import type { RiftexPlugin } from 'riftexpress'
-import { RiftexUnauthorizedError } from 'riftexpress'
+import type { IngeniumPlugin } from 'ingenium'
+import { IngeniumUnauthorizedError } from 'ingenium'
 
 interface AuthOpts { token: string; user: User }
 
-export const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
+export const authPlugin: IngeniumPlugin<AuthOpts> = (app, opts) => {
   app.hooks.onRequest((ctx) => {
     ctx.state.authValid = ctx.headers.authorization === `Bearer ${opts.token}`
   })
@@ -84,7 +84,7 @@ export const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
   app.decorate('user', (ctx) => ctx.state.authValid ? opts.user : null)
 
   app.decorate('requireAuth', (ctx) => () => {
-    if (!ctx.state.authValid) throw new RiftexUnauthorizedError()
+    if (!ctx.state.authValid) throw new IngeniumUnauthorizedError()
   })
 }
 

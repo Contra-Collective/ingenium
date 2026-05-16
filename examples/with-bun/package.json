@@ -1,9 +1,9 @@
 {
-  "name": "riftexpress-example-bun",
+  "name": "ingenium-example-bun",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Minimal RiftExpress server running on Bun.serve() via the BunAdapter transport.",
+  "description": "Minimal Ingenium server running on Bun.serve() via the BunAdapter transport.",
   "scripts": {
     "start": "bun src/index.ts",
     "dev": "bun --watch src/index.ts"
@@ -12,7 +12,7 @@
     "bun": ">=1.1.0"
   },
   "dependencies": {
-    "riftexpress": "*",
-    "riftexpress-bun": "*"
+    "ingenium": "*",
+    "ingenium-bun": "*"
   }
 }

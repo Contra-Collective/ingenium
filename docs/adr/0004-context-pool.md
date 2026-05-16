@@ -4,41 +4,41 @@
 Accepted (2026-05-12)
 
 ## Context
-On every request, RiftExpress needs a `RiftexContext` instance — the object
-exposed to middleware and handlers as `ctx` (see `API.md` §RiftexContext). It
+On every request, Ingenium needs a `IngeniumContext` instance — the object
+exposed to middleware and handlers as `ctx` (see `API.md` §IngeniumContext). It
 holds the request side (method, url, path, query, params, headers, body) and
 the response setters/writers (status, set, json, text, html, stream, redirect,
 send). It also carries `state: Record<string, unknown>` for per-request scratch.
 
-A naive implementation allocates a fresh `RiftexContext` per request:
+A naive implementation allocates a fresh `IngeniumContext` per request:
 
 ```ts
 async dispatch(req, res) {
-  const ctx = new RiftexContext(req, res)
+  const ctx = new IngeniumContext(req, res)
   await this.handle(ctx)
 }
 ```
 
 At 100k req/s that is 100k allocations per second of a moderately complex
 object plus its `state: {}` object plus a `URLSearchParams` plus the
-`RiftexBody` instance. V8 generational GC handles this fine for small objects,
-but `RiftexContext` has ~15 fields and several nested allocations, which puts
+`IngeniumBody` instance. V8 generational GC handles this fine for small objects,
+but `IngeniumContext` has ~15 fields and several nested allocations, which puts
 pressure on the young generation and triggers more frequent minor GCs.
 Minor GCs are stop-the-world. Stop-the-world on the request thread shows up
 as p99 latency spikes.
 
-API.md commits us to a pool: `riftex({ poolSize?: number })` and the
-`RiftexAppOptions.poolSize` field on `RiftexApp`. The default is 1024 (see
-`packages/riftexpress/src/app.ts`).
+API.md commits us to a pool: `ingenium({ poolSize?: number })` and the
+`IngeniumAppOptions.poolSize` field on `IngeniumApp`. The default is 1024 (see
+`packages/ingenium/src/app.ts`).
 
 ## Decision
-Pre-allocate a free list of `RiftexContext` instances in `RiftexContextPool`.
-On request: pop one off the free list (or `new RiftexContext()` if the list is
+Pre-allocate a free list of `IngeniumContext` instances in `IngeniumContextPool`.
+On request: pop one off the free list (or `new IngeniumContext()` if the list is
 empty), call `ctx.reset(req, res)` to populate it, dispatch, then push it
 back onto the free list. The pool has a fixed maximum (`poolSize`) — once
 the free list is full, additional contexts are dropped to GC.
 
-The transport (`packages/riftexpress/src/transport/node.ts`) calls
+The transport (`packages/ingenium/src/transport/node.ts`) calls
 `acquire`/`release` from the per-request flow:
 
 ```ts
@@ -61,7 +61,7 @@ Positive:
   context object itself in steady state. The `state: {}` allocation
   remains (it has to, for safety), but it's a single fresh-empty-object
   which V8 special-cases.
-- Hidden-class stability: every `RiftexContext` is constructed once, populated
+- Hidden-class stability: every `IngeniumContext` is constructed once, populated
   the same way every time. V8 keeps them on a single hidden class, which
   is the whole point of "monomorphic" call sites for the dispatcher and
   for user middleware.
@@ -73,18 +73,18 @@ Positive:
 
 Negative:
 - Cross-request data leaks are a real risk if `reset()` ever forgets a
-  field. Every new field added to `RiftexContext` requires a corresponding
+  field. Every new field added to `IngeniumContext` requires a corresponding
   reset. We mitigate with a unit test that creates a context, sets every
   public field, calls `reset()`, and asserts every field is back to its
   default. This needs to stay green forever.
 - Pool tuning is a footgun. Too small, and high-concurrency loads constantly
-  fall back to `new RiftexContext()` (no benefit, slight overhead from the
+  fall back to `new IngeniumContext()` (no benefit, slight overhead from the
   pool check). Too large, and you retain memory you don't need. Default
   1024 covers the vast majority of cases.
-- The pool makes it tempting to also pool `RiftexBody`, `URLSearchParams`,
+- The pool makes it tempting to also pool `IngeniumBody`, `URLSearchParams`,
   the `state` object, etc. We deliberately did not — pooling `state` is
   a security hazard, pooling `URLSearchParams` is incompatible with the
-  WHATWG class semantics, and pooling `RiftexBody` saves a cheap allocation
+  WHATWG class semantics, and pooling `IngeniumBody` saves a cheap allocation
   in exchange for stream-state bugs.
 - A handler that holds a reference to `ctx` past the response (e.g., to
   log async after `next()`) will see that `ctx` mutated mid-flight. This
@@ -94,7 +94,7 @@ Negative:
 
 - **Per-request allocation (Express, Hono with Node adapter).** Simpler.
   Costs us hidden-class stability and adds GC pressure. The whole
-  performance pitch of RiftExpress depends on us avoiding this.
+  performance pitch of Ingenium depends on us avoiding this.
 - **WeakMap-keyed external state.** Keep the framework stateless and store
   per-request data in a `WeakMap<Request, ContextData>`. Slower lookup
   than a property access, no pooling story, and the WeakMap eventually

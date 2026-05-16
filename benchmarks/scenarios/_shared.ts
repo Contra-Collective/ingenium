@@ -83,7 +83,7 @@ export function printComparison(
   riftResult: BenchMetrics
 ): void {
   const rows: Array<[string, string, string, string]> = [
-    ['Metric', 'Express', 'RiftExpress', 'Rift / Express'],
+    ['Metric', 'Express', 'Ingenium', 'Rift / Express'],
     [
       'Requests/sec (avg)',
       fmtNum(expressResult.requestsPerSec),

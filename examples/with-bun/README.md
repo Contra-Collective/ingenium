@@ -1,6 +1,6 @@
-# Example: RiftExpress on Bun
+# Example: Ingenium on Bun
 
-A minimal RiftExpress server that uses `BunAdapter` instead of the default
+A minimal Ingenium server that uses `BunAdapter` instead of the default
 Node `http` transport. Same routes, same handlers, same `ctx` — only the
 underlying server changes.
 
@@ -30,6 +30,6 @@ curl -X POST -H "content-type: application/json" \
 
 `Bun.serve()` uses the WinterCG `Request` / `Response` shape, not Node's
 `IncomingMessage` / `ServerResponse`. `BunAdapter` translates between the
-two so the framework's pooled `RiftexContext` and lazy body parsers work
-unchanged. See [`packages/riftexpress-bun`](../../packages/riftexpress-bun)
+two so the framework's pooled `IngeniumContext` and lazy body parsers work
+unchanged. See [`packages/ingenium-bun`](../../packages/ingenium-bun)
 for the adapter source and known limitations.

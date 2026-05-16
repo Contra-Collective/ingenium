@@ -12,9 +12,9 @@
 //              curl 'http://localhost:3000/search?q=rift&page=2'
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 
 app.get('/users/:id', (ctx) => ({
   id: ctx.params.id,

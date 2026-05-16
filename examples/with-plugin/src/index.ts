@@ -1,4 +1,4 @@
-// RiftExpress: plugin system example.
+// Ingenium: plugin system example.
 //
 // This file demonstrates:
 //   1. Defining a plugin (function that mutates an app)
@@ -7,13 +7,13 @@
 //   4. Decorating ctx with both lazy (`decorate`) and eager (`decorateRequest`) values
 //   5. Module augmentation so `ctx.user` etc. show up in TypeScript intellisense
 
-import { riftex, RiftexUnauthorizedError, type RiftexPlugin } from 'riftexpress'
+import { ingenium, IngeniumUnauthorizedError, type IngeniumPlugin } from 'ingenium'
 
 // ─── Module augmentation ──────────────────────────────────────────────────
 // Any ctx properties added by `decorate` / `decorateRequest` should be
 // declared here so TypeScript sees them on every handler's `ctx`.
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     user: { id: string; name: string } | null
     requireAuth: () => void
     requestId: string
@@ -25,7 +25,7 @@ interface AuthOpts {
   secret: string
 }
 
-const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
+const authPlugin: IngeniumPlugin<AuthOpts> = (app, opts) => {
   // onRequest hook: runs before middleware/handler on every request.
   // Useful for tracing, validating tokens, stamping a request ID.
   app.hooks.onRequest((ctx) => {
@@ -42,7 +42,7 @@ const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
 
   // Lazy decorator returning a function — handy for guard helpers.
   app.decorate('requireAuth', (ctx) => () => {
-    if (!ctx.state.authValid) throw new RiftexUnauthorizedError()
+    if (!ctx.state.authValid) throw new IngeniumUnauthorizedError()
   })
 
   // Eager decorator: assigned to every ctx at the start of every request.
@@ -51,7 +51,7 @@ const authPlugin: RiftexPlugin<AuthOpts> = (app, opts) => {
 }
 
 // ─── Wire it up ───────────────────────────────────────────────────────────
-const app = riftex()
+const app = ingenium()
 await app.register(authPlugin, { secret: 'demo' })
 
 app.get('/', (ctx) => ({
@@ -59,7 +59,7 @@ app.get('/', (ctx) => ({
   requestId: ctx.requestId,
 }))
 
-// Protected route — `requireAuth()` throws RiftexUnauthorizedError if the
+// Protected route — `requireAuth()` throws IngeniumUnauthorizedError if the
 // `Authorization: Bearer demo` header isn't present, which the default
 // error boundary serializes as a 401 JSON response.
 app.get('/me', (ctx) => {

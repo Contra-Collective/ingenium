@@ -8,7 +8,7 @@
 //      to mint a fresh id — defends against session-fixation attacks.
 //    • The default store is in-memory and single-process only. For
 //      multi-replica deployments swap in `RedisSessionStore` from the
-//      `riftexpress-redis` package — same API, different `store:` option.
+//      `ingenium-redis` package — same API, different `store:` option.
 //
 //  Run:        npm run 8
 //  Try it:     curl -i -c jar -X POST http://localhost:3000/login \
@@ -19,15 +19,15 @@
 //              curl -b jar http://localhost:3000/me            # session gone
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex, sessionMiddleware, type Session } from 'riftexpress'
+import { ingenium, sessionMiddleware, type Session } from 'ingenium'
 
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     session: Session
   }
 }
 
-const app = riftex()
+const app = ingenium()
 
 app.use(sessionMiddleware({
   secret: ['dev-secret-rotate-me'],

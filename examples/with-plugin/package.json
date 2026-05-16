@@ -1,9 +1,9 @@
 {
-  "name": "riftexpress-example-plugin",
+  "name": "ingenium-example-plugin",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Demonstrates the RiftExpress plugin system: register, hooks, decorators, and the module-augmentation pattern.",
+  "description": "Demonstrates the Ingenium plugin system: register, hooks, decorators, and the module-augmentation pattern.",
   "scripts": {
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts"
@@ -12,7 +12,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "riftexpress": "*"
+    "ingenium": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

@@ -1,9 +1,9 @@
-# `RiftexContext`
+# `IngeniumContext`
 
 The per-request object passed to every middleware and handler. Pool-bound: one instance per pool slot, reused across thousands of requests. All mutable fields are reset between uses; the reset is a sequence of reassignments to keep the V8 hidden class stable so subsequent allocations stay monomorphic.
 
 ```ts
-class RiftexContext<Params = Record<string, string>>
+class IngeniumContext<Params = Record<string, string>>
 ```
 
 `Params` is a phantom generic — narrowing `ctx.params` for typed handlers — that's `Record<string, string>` at runtime.
@@ -41,13 +41,13 @@ app.get('/search', (ctx) => ({
 
 ### `params: Params`
 
-Route params written at trie-match time. Defaults to a frozen sentinel `EMPTY_PARAMS` so `ctx.params.foo` is safe even on routes with no params. When `Params` is supplied (via `RiftexHandler<P>` or by typing the handler signature), TypeScript narrows it.
+Route params written at trie-match time. Defaults to a frozen sentinel `EMPTY_PARAMS` so `ctx.params.foo` is safe even on routes with no params. When `Params` is supplied (via `IngeniumHandler<P>` or by typing the handler signature), TypeScript narrows it.
 
 ### `headers: IncomingHttpHeaders`
 
 Lowercased request headers, per Node's `node:http` convention. Values are `string | string[] | undefined`. Defaults to `{}`.
 
-### `body: RiftexBody`
+### `body: IngeniumBody`
 
 Lazy body accessor. See [body.md](./body.md) for `json`, `text`, `urlencoded`, `buffer`, `stream`, `multipart`. The adapter attaches the raw stream to `ctx.body` on every request; nothing is read until you call a parser.
 
@@ -148,19 +148,19 @@ ctx.redirect('/v2/items', 301)        // 301
 
 ### `stream(readable: Readable, contentType?: string): void`
 
-Pipe a `node:stream` `Readable` to the client. If `contentType` is provided and `Content-Type` isn't already set, it's stamped. Used internally by `riftex.sse` (which sets `text/event-stream`).
+Pipe a `node:stream` `Readable` to the client. If `contentType` is provided and `Content-Type` isn't already set, it's stamped. Used internally by `ingenium.sse` (which sets `text/event-stream`).
 
 ---
 
 ## Pool semantics
 
-A `RiftexContextPool` (default `poolSize: 1024`) keeps a free list of `RiftexContext` instances. On every request the transport calls `acquire()` to pull one; on release the framework calls `reset()` to zero every field by reassignment, then returns it to the pool.
+A `IngeniumContextPool` (default `poolSize: 1024`) keeps a free list of `IngeniumContext` instances. On every request the transport calls `acquire()` to pull one; on release the framework calls `reset()` to zero every field by reassignment, then returns it to the pool.
 
 The reassignment style is intentional: it preserves the V8 hidden class so the next request finds the same shape. This is the difference between monomorphic and megamorphic property access — significant on a hot path that runs millions of times.
 
 ### `reset(): void` — internal
 
-`RiftexContext.reset()` is `@internal`. The pool calls it; user code should not. Listed here for completeness:
+`IngeniumContext.reset()` is `@internal`. The pool calls it; user code should not. Listed here for completeness:
 
 - All request fields revert to defaults (`method: 'GET'`, `path: '/'`, `headers: {}`, `state: Object.create(null)`, etc.).
 - The cached `_query` is dropped.

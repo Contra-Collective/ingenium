@@ -7,11 +7,11 @@
 There are two private channels:
 
 1. **Preferred — GitHub Security Advisories.** Open a draft advisory at
-   <https://github.com/riftexpress/riftexpress/security/advisories/new>.
+   <https://github.com/ingenium/ingenium/security/advisories/new>.
    Maintainers receive a notification and the advisory remains private
    until publication.
 2. **Email.** Send a description and reproduction to
-   `security@riftexpress.dev`. Please encrypt sensitive details if you
+   `security@ingenium.dev`. Please encrypt sensitive details if you
    have a maintainer's PGP key available.
 
 Include in your report:
@@ -59,8 +59,8 @@ expands to the previous major.
 In scope:
 
 - The packages published from this repository
-  (`riftexpress`, `riftexpress-compat`, `riftexpress-bun`,
-  `riftexpress-cli`).
+  (`ingenium`, `ingenium-compat`, `ingenium-bun`,
+  `ingenium-cli`).
 - The CLI and its scaffolded templates.
 - Documentation that asserts security behavior (e.g. `sessionMiddleware`
   signing, `cors` defaults, `rateLimit` key generation).

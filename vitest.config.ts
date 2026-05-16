@@ -7,11 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       // In dev, resolve workspace bare specifiers to source so we don't need a build step.
-      'riftexpress-compat': here('./packages/riftexpress-compat/src/index.ts'),
-      'riftexpress-bun': here('./packages/riftexpress-bun/src/index.ts'),
-      'riftexpress-cli': here('./packages/riftexpress-cli/src/cli.ts'),
-      'riftexpress-redis': here('./packages/riftexpress-redis/src/index.ts'),
-      riftexpress: here('./packages/riftexpress/src/index.ts'),
+      'ingenium-compat': here('./packages/ingenium-compat/src/index.ts'),
+      'ingenium-bun': here('./packages/ingenium-bun/src/index.ts'),
+      'ingenium-cli': here('./packages/ingenium-cli/src/cli.ts'),
+      'ingenium-redis': here('./packages/ingenium-redis/src/index.ts'),
+      ingenium: here('./packages/ingenium/src/index.ts'),
     },
   },
   test: {

@@ -1,9 +1,9 @@
 {
-  "name": "riftexpress-learn",
+  "name": "ingenium-learn",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Progressive tutorial: learn RiftExpress one concept at a time.",
+  "description": "Progressive tutorial: learn Ingenium one concept at a time.",
   "scripts": {
     "step": "tsx",
     "1": "tsx steps/01-hello.ts",
@@ -19,7 +19,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "riftexpress": "*"
+    "ingenium": "*"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",

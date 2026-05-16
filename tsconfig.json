@@ -4,24 +4,24 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "riftexpress": ["./packages/riftexpress/src/index.ts"],
-      "riftexpress/*": ["./packages/riftexpress/src/*"],
-      "riftexpress-compat": ["./packages/riftexpress-compat/src/index.ts"],
-      "riftexpress-bun": ["./packages/riftexpress-bun/src/index.ts"],
-      "riftexpress-cli": ["./packages/riftexpress-cli/src/cli.ts"],
-      "riftexpress-redis": ["./packages/riftexpress-redis/src/index.ts"]
+      "ingenium": ["./packages/ingenium/src/index.ts"],
+      "ingenium/*": ["./packages/ingenium/src/*"],
+      "ingenium-compat": ["./packages/ingenium-compat/src/index.ts"],
+      "ingenium-bun": ["./packages/ingenium-bun/src/index.ts"],
+      "ingenium-cli": ["./packages/ingenium-cli/src/cli.ts"],
+      "ingenium-redis": ["./packages/ingenium-redis/src/index.ts"]
     }
   },
   "include": [
-    "packages/riftexpress/src/**/*",
-    "packages/riftexpress/test/**/*",
-    "packages/riftexpress-compat/src/**/*",
-    "packages/riftexpress-compat/test/**/*",
-    "packages/riftexpress-bun/src/**/*",
-    "packages/riftexpress-bun/test/**/*",
-    "packages/riftexpress-cli/src/**/*",
-    "packages/riftexpress-cli/test/**/*",
-    "packages/riftexpress-redis/src/**/*",
-    "packages/riftexpress-redis/test/**/*"
+    "packages/ingenium/src/**/*",
+    "packages/ingenium/test/**/*",
+    "packages/ingenium-compat/src/**/*",
+    "packages/ingenium-compat/test/**/*",
+    "packages/ingenium-bun/src/**/*",
+    "packages/ingenium-bun/test/**/*",
+    "packages/ingenium-cli/src/**/*",
+    "packages/ingenium-cli/test/**/*",
+    "packages/ingenium-redis/src/**/*",
+    "packages/ingenium-redis/test/**/*"
   ]
 }

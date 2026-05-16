@@ -14,6 +14,6 @@ await runScenario(
     { name: 'Express', file: srv('express-body.ts'), path: '/echo', method: 'POST', body, headers },
     { name: 'Fastify', file: srv('fastify-body.ts'), path: '/echo', method: 'POST', body, headers },
     { name: 'Hono', file: srv('hono-body.ts'), path: '/echo', method: 'POST', body, headers },
-    { name: 'RiftExpress', file: srv('rift-body.ts'), path: '/echo', method: 'POST', body, headers },
+    { name: 'Ingenium', file: srv('rift-body.ts'), path: '/echo', method: 'POST', body, headers },
   ],
 )

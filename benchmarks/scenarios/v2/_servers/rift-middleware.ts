@@ -1,7 +1,7 @@
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
 const LAYERS = 10
-const app = riftex()
+const app = ingenium()
 
 for (let i = 1; i <= LAYERS; i++) {
   const key = `layer${i}`

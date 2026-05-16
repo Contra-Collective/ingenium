@@ -1,6 +1,6 @@
-# Express → RiftExpress Migration Guide
+# Express → Ingenium Migration Guide
 
-RiftExpress (`riftex`) is a small, typed HTTP framework with an Express-shaped API and a lazy-composed middleware pipeline. Most Express code ports over by renaming `app` → `riftex()` and dropping the `req, res, next` triple for a single `ctx`. There is **one intentional breaking change**: handlers return values instead of calling `res.send` / `res.json`. Whatever you `return` from a handler is reflected to the wire (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204). You can still call `ctx.json(...)` etc. explicitly when you want control over status or headers.
+Ingenium (`ingenium`) is a small, typed HTTP framework with an Express-shaped API and a lazy-composed middleware pipeline. Most Express code ports over by renaming `app` → `ingenium()` and dropping the `req, res, next` triple for a single `ctx`. There is **one intentional breaking change**: handlers return values instead of calling `res.send` / `res.json`. Whatever you `return` from a handler is reflected to the wire (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204). You can still call `ctx.json(...)` etc. explicitly when you want control over status or headers.
 
 ---
 
@@ -17,9 +17,9 @@ app.listen(3000)
 ```
 
 ```ts
-// RiftExpress
-import { riftex } from 'riftexpress'
-const app = riftex()
+// Ingenium
+import { ingenium } from 'ingenium'
+const app = ingenium()
 app.get('/', (ctx) => 'hello')
 await app.listen(3000)
 ```
@@ -36,7 +36,7 @@ app.get('/users/:id', (req, res) => {
 ```
 
 ```ts
-// RiftExpress — params are typed via ExtractParams<'/users/:id'>
+// Ingenium — params are typed via ExtractParams<'/users/:id'>
 app.get('/users/:id', (ctx) => ({ id: ctx.params.id }))
 ```
 
@@ -59,7 +59,7 @@ app.get('/search', (req, res) => {
 ```
 
 ```ts
-// RiftExpress — ctx.query is a URLSearchParams (lazy parsed)
+// Ingenium — ctx.query is a URLSearchParams (lazy parsed)
 app.get('/search', (ctx) => ({ q: ctx.query.get('q') }))
 ```
 
@@ -80,7 +80,7 @@ app.post('/users', (req, res) => {
 ```
 
 ```ts
-// RiftExpress — parsing is lazy; riftex.json() is a no-op stub for compat.
+// Ingenium — parsing is lazy; ingenium.json() is a no-op stub for compat.
 app.post('/users', async (ctx) => {
   const body = await ctx.body.json()
   return body
@@ -96,7 +96,7 @@ app.post('/form', (req, res) => res.json(req.body))
 ```
 
 ```ts
-// RiftExpress
+// Ingenium
 app.post('/form', async (ctx) => ctx.body.urlencoded())
 ```
 
@@ -112,7 +112,7 @@ app.post('/users', async (ctx) => {
 })
 ```
 
-A failed parse throws `RiftexValidationError` with a `fields` map.
+A failed parse throws `IngeniumValidationError` with a `fields` map.
 
 ---
 
@@ -127,7 +127,7 @@ res.redirect(302, '/login')
 ```
 
 ```ts
-// RiftExpress
+// Ingenium
 ctx.json({ ok: true }, 201)
 ctx.text('hi')
 ctx.html('<h1>hi</h1>')
@@ -164,7 +164,7 @@ app.use(async (req, res, next) => {
 ```
 
 ```ts
-// RiftExpress — single signature, await next() instead of calling next()
+// Ingenium — single signature, await next() instead of calling next()
 app.use(async (ctx, next) => {
   ctx.state.startedAt = Date.now()
   await next()
@@ -192,8 +192,8 @@ app.use('/users', users)
 ```
 
 ```ts
-// RiftExpress
-import { Router } from 'riftexpress'
+// Ingenium
+import { Router } from 'ingenium'
 const users = Router()
 users.get('/',    (ctx) => [])
 users.get('/:id', (ctx) => ({ id: ctx.params.id }))
@@ -221,17 +221,17 @@ app.use((err, req, res, next) => {
 })
 ```
 
-RiftExpress has a dedicated `onError`:
+Ingenium has a dedicated `onError`:
 
 ```ts
-// RiftExpress
-import { RiftexError, RiftexValidationError } from 'riftexpress'
+// Ingenium
+import { IngeniumError, IngeniumValidationError } from 'ingenium'
 
 app.onError((err, ctx) => {
-  if (err instanceof RiftexValidationError) {
+  if (err instanceof IngeniumValidationError) {
     return ctx.json({ error: err.message, fields: err.fields }, 422)
   }
-  if (err instanceof RiftexError) throw err  // re-throw to default boundary
+  if (err instanceof IngeniumError) throw err  // re-throw to default boundary
   ctx.json({ error: 'internal' }, 500)
 })
 ```
@@ -243,14 +243,14 @@ Re-throwing falls back to the default JSON error boundary
 
 ## 404 handling
 
-Unmatched routes throw `RiftexNotFoundError`, which the default boundary
+Unmatched routes throw `IngeniumNotFoundError`, which the default boundary
 serializes as a 404. To customize:
 
 ```ts
-import { RiftexNotFoundError } from 'riftexpress'
+import { IngeniumNotFoundError } from 'ingenium'
 
 app.onError((err, ctx) => {
-  if (err instanceof RiftexNotFoundError) {
+  if (err instanceof IngeniumNotFoundError) {
     return ctx.html('<h1>nope</h1>', 404)
   }
   throw err
@@ -276,18 +276,18 @@ app.use(express.static('./public'))
 ```
 
 ```ts
-// RiftExpress
-app.use(riftex.static('./public'))
+// Ingenium
+app.use(ingenium.static('./public'))
 ```
 
-`riftex.static(root, opts?)` ships with ETag, conditional GET (`If-None-Match`),
+`ingenium.static(root, opts?)` ships with ETag, conditional GET (`If-None-Match`),
 range requests, MIME detection from extension, and a configurable directory
 index (default `index.html`). Options include `index`, `maxAge` (milliseconds,
 matching Express's convention), `extensions`, and `dotfiles` (`'allow' |
 'deny' | 'ignore'`, default `'ignore'`).
 
 ```ts
-app.use('/assets', riftex.static('./public', {
+app.use('/assets', ingenium.static('./public', {
   maxAge: 60_000,
   extensions: ['html'],
   dotfiles: 'deny',
@@ -300,15 +300,15 @@ app.use('/assets', riftex.static('./public', {
 
 Pure-function Express middleware (cors, helmet, morgan, compression-ish
 logic) works through the compat shim, which adapts the `(req, res, next)`
-signature onto a `RiftexContext`.
+signature onto a `IngeniumContext`.
 
 ```ts
-import { riftex } from 'riftexpress'
-import { expressCompat } from 'riftexpress-compat'
+import { ingenium } from 'ingenium'
+import { expressCompat } from 'ingenium-compat'
 import cors from 'cors'
 import helmet from 'helmet'
 
-const app = riftex()
+const app = ingenium()
 app.use(expressCompat(cors({ origin: 'https://example.com' })))
 app.use(expressCompat(helmet()))
 ```
@@ -330,7 +330,7 @@ shim and need native ports (or replacement) before v1.0:
 | `multer`             | Owns the request stream and writes to `req.files`; clashes with lazy `ctx.body`. Needs a native `ctx.body.multipart()` API. |
 | `passport`           | Strategies mutate `req.user` and call `req.logIn` / session APIs the shim doesn't provide. |
 | `express-session`    | Hooks `res.end` to flush the session and depends on a cookie-jar contract we don't expose. |
-| `csurf`              | Deprecated by its own author; use **`riftex.csrf({ secret })`** instead — see below. |
+| `csurf`              | Deprecated by its own author; use **`ingenium.csrf({ secret })`** instead — see below. |
 | `express-rate-limit` | Patches `res` and uses Express response lifecycle hooks; needs a native limiter middleware (planned). |
 
 ---
@@ -338,19 +338,19 @@ shim and need native ports (or replacement) before v1.0:
 ## Things that look the same but aren't
 
 - **Handler return values are wire output.** Returning a string from a
-  handler in Express does nothing; in RiftExpress it sends a 200 response.
+  handler in Express does nothing; in Ingenium it sends a 200 response.
   If you don't want this, call `ctx.json(...)` / `ctx.text(...)` and let
   the function return `undefined`.
 - **Async middleware is the only kind.** There is no callback `next(err)`
   pattern — throw, or `await next()` and inspect after. Sync middleware
   still works (you don't have to mark it `async`), but `next()` always
   returns a `Promise<void>`.
-- **`riftex.json()` and `riftex.urlencoded()` are no-op stubs.** Body parsing is
+- **`ingenium.json()` and `ingenium.urlencoded()` are no-op stubs.** Body parsing is
   lazy via `ctx.body.json()` / `ctx.body.urlencoded()`. The functions
   exist so `app.use(express.json())` lines port mechanically; they don't
   install a parser, configure limits, or mutate `ctx.body`. Pass
   `maxBytes` to the body method instead.
-- **No `next('route')` semantics.** RiftExpress doesn't have Express's
+- **No `next('route')` semantics.** Ingenium doesn't have Express's
   router-skip control flow. Use early `return` from a handler, branch
   inside one route, or split into separate routers.
 - **Lazy composition, not frozen-after-listen.** You can `app.get(...)`
@@ -359,11 +359,11 @@ shim and need native ports (or replacement) before v1.0:
 
 ---
 
-## CSRF protection (`csurf` → `riftex.csrf`)
+## CSRF protection (`csurf` → `ingenium.csrf`)
 
 Express's `csurf` package was deprecated by its maintainer in 2022 and never
-had a clean replacement in the Express ecosystem. RiftExpress ships
-`riftex.csrf(opts)` natively.
+had a clean replacement in the Express ecosystem. Ingenium ships
+`ingenium.csrf(opts)` natively.
 
 ```ts
 // Express + the (deprecated) csurf package
@@ -376,10 +376,10 @@ app.get('/form', (req, res) => res.send(`<form>
 ```
 
 ```ts
-// RiftExpress
-import { riftex } from 'riftexpress'
+// Ingenium
+import { ingenium } from 'ingenium'
 
-app.use(riftex.csrf({
+app.use(ingenium.csrf({
   secret: process.env.CSRF_SECRET!,    // required for cookie storage
   cookie: { sameSite: 'lax', secure: true },
 }))
@@ -391,7 +391,7 @@ app.get('/form', (ctx) => `<form>
 
 Two storage modes — `'cookie'` (default; double-submit with HMAC, no
 session needed) and `'session'` (synchronizer pattern; pair with
-`sessionMiddleware`). Failures throw `RiftexCsrfError` (HTTP 403). See
+`sessionMiddleware`). Failures throw `IngeniumCsrfError` (HTTP 403). See
 [docs/api/csrf.md](api/csrf.md) for the full surface.
 
 ---
@@ -400,7 +400,7 @@ session needed) and `'session'` (synchronizer pattern; pair with
 
 Express has no formal plugin system — middleware is the only extension
 point, and shared state has to be smuggled through `app.locals` or by
-mutating `req`. RiftExpress ships an explicit one.
+mutating `req`. Ingenium ships an explicit one.
 
 A plugin is just a function that receives the app and (optionally)
 options: `app.register(plugin, opts?)`. Plugins can register lifecycle
@@ -426,12 +426,12 @@ keep-alive sockets are dropped without `Connection: close`, and DB pools
 never get a chance to flush. Most production Express apps quietly leak
 five-nines availability this way.
 
-RiftExpress ships a tiny helper you call once after `listen()`:
+Ingenium ships a tiny helper you call once after `listen()`:
 
 ```ts
-import { riftex, gracefulShutdown } from 'riftexpress'
+import { ingenium, gracefulShutdown } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 // ... routes ...
 const server = await app.listen(3000)
 

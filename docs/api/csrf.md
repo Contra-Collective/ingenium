@@ -1,13 +1,13 @@
-# `riftex.csrf` — CSRF protection
+# `ingenium.csrf` — CSRF protection
 
-Source: [`packages/riftexpress/src/csrf/middleware.ts`](../../packages/riftexpress/src/csrf/middleware.ts), [`csrf/types.ts`](../../packages/riftexpress/src/csrf/types.ts).
+Source: [`packages/ingenium/src/csrf/middleware.ts`](../../packages/ingenium/src/csrf/middleware.ts), [`csrf/types.ts`](../../packages/ingenium/src/csrf/types.ts).
 
 ```ts
-import { riftex, csrfMiddleware, RiftexCsrfError } from 'riftexpress'
-import type { CsrfOptions, CsrfStorage, CsrfCookieOptions, CsrfValueReader } from 'riftexpress'
+import { ingenium, csrfMiddleware, IngeniumCsrfError } from 'ingenium'
+import type { CsrfOptions, CsrfStorage, CsrfCookieOptions, CsrfValueReader } from 'ingenium'
 ```
 
-`riftex.csrf(opts)` is an alias for `csrfMiddleware(opts)`.
+`ingenium.csrf(opts)` is an alias for `csrfMiddleware(opts)`.
 
 ---
 
@@ -21,7 +21,7 @@ We deliberately do **not** auto-detect the presence of `sessionMiddleware`. Midd
 ```ts
 // Sessioned app — opt in to session storage
 app.use(sessionMiddleware({ secret: process.env.SESSION_SECRET! }))
-app.use(riftex.csrf({ storage: 'session' }))
+app.use(ingenium.csrf({ storage: 'session' }))
 ```
 
 ## Storage modes
@@ -30,12 +30,12 @@ app.use(riftex.csrf({ storage: 'session' }))
 
 Double-submit cookie pattern with HMAC signing.
 
-1. On a safe request (`GET`/`HEAD`/`OPTIONS`/`TRACE`), the middleware ensures a token cookie exists. If absent, it mints `randomBytes(18)` (base64url) + an HMAC-SHA-256 signature, joined as `<raw>.<sig>`, and writes it as `Set-Cookie: riftex.csrf=...`.
+1. On a safe request (`GET`/`HEAD`/`OPTIONS`/`TRACE`), the middleware ensures a token cookie exists. If absent, it mints `randomBytes(18)` (base64url) + an HMAC-SHA-256 signature, joined as `<raw>.<sig>`, and writes it as `Set-Cookie: ingenium.csrf=...`.
 2. On an unsafe request (`POST`/`PUT`/`PATCH`/`DELETE`/...), it:
    - Reads the cookie value, verifies the HMAC signature against `secret` (or any value in the rotation array)
    - Reads the submitted token from the configured value reader (default: `X-CSRF-Token` header → `X-XSRF-Token` header → `?_csrf=` query param)
    - Compares the two with `crypto.timingSafeEqual`
-   - Throws `RiftexCsrfError` (HTTP 403, code `CSRF_FAILED`) on any mismatch
+   - Throws `IngeniumCsrfError` (HTTP 403, code `CSRF_FAILED`) on any mismatch
 
 `secret` is **required** in this mode. Without it the middleware throws at construction.
 
@@ -60,7 +60,7 @@ interface CsrfOptions {
 }
 
 interface CsrfCookieOptions {
-  name?: string             // default 'riftex.csrf'
+  name?: string             // default 'ingenium.csrf'
   path?: string             // default '/'
   domain?: string
   sameSite?: 'lax' | 'strict' | 'none'   // default 'lax'
@@ -80,7 +80,7 @@ Inside a handler, the active token is exposed two ways:
 
 ```ts
 app.get('/form', (ctx) => {
-  const token = (ctx as RiftexContext & { csrfToken: () => string }).csrfToken()
+  const token = (ctx as IngeniumContext & { csrfToken: () => string }).csrfToken()
   // or: const token = ctx.state.csrfToken as string
   return `<form method="POST" action="/submit">
     <input type="hidden" name="_csrf" value="${token}">
@@ -89,11 +89,11 @@ app.get('/form', (ctx) => {
 })
 ```
 
-For typed access without the cast, augment `RiftexContext` in your project:
+For typed access without the cast, augment `IngeniumContext` in your project:
 
 ```ts
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     csrfToken(): string
   }
 }
@@ -104,7 +104,7 @@ declare module 'riftexpress' {
 ## Failure mode
 
 ```ts
-class RiftexCsrfError extends RiftexError {
+class IngeniumCsrfError extends IngeniumError {
   statusCode = 403
   code = 'CSRF_FAILED'
 }
@@ -114,7 +114,7 @@ The default error boundary serializes it as `{ error: 'CSRF token validation fai
 
 ```ts
 app.onError((err, ctx) => {
-  if (err instanceof RiftexCsrfError) {
+  if (err instanceof IngeniumCsrfError) {
     return ctx.json({ error: 'Refresh and try again', code: err.code }, 403)
   }
   throw err
@@ -128,7 +128,7 @@ app.onError((err, ctx) => {
 Common opt-outs:
 
 ```ts
-app.use(riftex.csrf({
+app.use(ingenium.csrf({
   secret: process.env.CSRF_SECRET!,
   skip: (ctx) =>
     ctx.path.startsWith('/api/webhooks/') ||  // signed by sender, not a browser
@@ -143,7 +143,7 @@ app.use(riftex.csrf({
 ## Rotation
 
 ```ts
-app.use(riftex.csrf({
+app.use(ingenium.csrf({
   secret: [
     process.env.CSRF_SECRET_NEW!,   // signs new responses
     process.env.CSRF_SECRET_OLD!,   // still verifies old cookies
@@ -159,6 +159,6 @@ After everyone has refreshed (cookie max-age elapsed), drop the old key. Rotatio
 
 - It does not prevent same-origin XSS exfiltrating the cookie.
 - It does not authenticate the user; pair it with `sessionMiddleware` or a bearer-token plugin.
-- It does not rate-limit; pair it with `riftex.rateLimit` on auth endpoints.
+- It does not rate-limit; pair it with `ingenium.rateLimit` on auth endpoints.
 
 Use it together with the rest of the security layer (TLS, secure session cookies, content-security-policy, helmet equivalents) — not as a substitute.

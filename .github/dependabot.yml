@@ -10,7 +10,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/packages/riftexpress"
+    directory: "/packages/ingenium"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -19,7 +19,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/packages/riftexpress-compat"
+    directory: "/packages/ingenium-compat"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -28,7 +28,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/packages/riftexpress-bun"
+    directory: "/packages/ingenium-bun"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -37,7 +37,7 @@ updates:
         dependency-type: development
 
   - package-ecosystem: npm
-    directory: "/packages/riftexpress-cli"
+    directory: "/packages/ingenium-cli"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

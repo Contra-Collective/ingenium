@@ -5,7 +5,7 @@
 //    • `await ctx.body.json()` lazily reads + parses the request body.
 //    • Pass a validator (`{ parse(input): T }`, Zod, ArkType, or any
 //      Standard-Schema-v1 validator) and the parser will narrow the type and
-//      throw `RiftexValidationError` on bad input.
+//      throw `IngeniumValidationError` on bad input.
 //    • The default error boundary serializes that error as a 422 with a
 //      `fields` map — no custom handler required for the happy validation path.
 //
@@ -18,7 +18,7 @@
 //                -d '{"name":"Ada"}'                              # 422
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
 interface NewUser {
   name: string
@@ -35,7 +35,7 @@ const NewUserSchema = {
   },
 }
 
-const app = riftex()
+const app = ingenium()
 
 app.post('/users', async (ctx) => {
   const user = await ctx.body.json(NewUserSchema)

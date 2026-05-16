@@ -11,6 +11,6 @@ await runScenario(
     { name: 'Express', file: srv('express-middleware.ts') },
     { name: 'Fastify', file: srv('fastify-middleware.ts') },
     { name: 'Hono', file: srv('hono-middleware.ts') },
-    { name: 'RiftExpress', file: srv('rift-middleware.ts') },
+    { name: 'Ingenium', file: srv('rift-middleware.ts') },
   ],
 )

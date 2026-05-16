@@ -14,7 +14,7 @@
 //                -d '{"text":"hello"}'
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex, Router } from 'riftexpress'
+import { ingenium, Router } from 'ingenium'
 
 const notes: { id: number; text: string }[] = []
 
@@ -31,7 +31,7 @@ const api = Router()
 api.get('/health', () => ({ ok: true }))
 api.use('/notes', notesRouter)
 
-const app = riftex()
+const app = ingenium()
 app.use('/api', api)
 
 const server = await app.listen(3000)

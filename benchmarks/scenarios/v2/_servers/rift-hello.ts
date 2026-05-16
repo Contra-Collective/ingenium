@@ -1,6 +1,6 @@
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 app.get('/', () => ({ ok: true }))
 
 const handle = await app.listen(0, '127.0.0.1')

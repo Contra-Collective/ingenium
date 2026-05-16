@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: which workspace to publish (riftexpress, riftexpress-compat, riftexpress-bun, riftexpress-cli)
+        description: which workspace to publish (ingenium, ingenium-compat, ingenium-bun, ingenium-cli)
         required: true
-        default: riftexpress
+        default: ingenium
 
 jobs:
   publish:

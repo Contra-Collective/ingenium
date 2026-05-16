@@ -13,14 +13,14 @@ deferred items and likely-to-shift surfaces.
 
 ### Added — P0 production hardening (items 2–8)
 
-- **Per-request timeout** (`riftex({ requestTimeoutMs })`). New `RiftexTimeoutError` (503). Late-write protection via per-context `_epoch` counter — orphaned-handler writes after a timeout are detected and discarded so the next request bound to the same pooled context isn't corrupted.
-- **Hard request-body cap at the transport layer** (`riftex({ maxRequestBytes })`, default 2 MiB). Wrapped via `createByteLimit` Transform on the source stream so the cap applies regardless of which `ctx.body.*` consumer reads — including `ctx.body.stream()`. Content-Length pre-check rejects oversized requests with 413 before acquiring a context. Wired into NodeAdapter, BunAdapter, Http2Adapter, and Http2cAdapter.
+- **Per-request timeout** (`ingenium({ requestTimeoutMs })`). New `IngeniumTimeoutError` (503). Late-write protection via per-context `_epoch` counter — orphaned-handler writes after a timeout are detected and discarded so the next request bound to the same pooled context isn't corrupted.
+- **Hard request-body cap at the transport layer** (`ingenium({ maxRequestBytes })`, default 2 MiB). Wrapped via `createByteLimit` Transform on the source stream so the cap applies regardless of which `ctx.body.*` consumer reads — including `ctx.body.stream()`. Content-Length pre-check rejects oversized requests with 413 before acquiring a context. Wired into NodeAdapter, BunAdapter, Http2Adapter, and Http2cAdapter.
 - **Asymmetric JWT (RS256/RS384/RS512, PS256/PS384/PS512, ES256/ES384/ES512)** + **JWKS support**. New `jwksUrl` / `jwksCacheMs` / `JwtKey` types. Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally — even if a caller adds it to `algorithms`. Built on `node:crypto` with zero new runtime deps. EC curves: P-256/P-384/P-521 (note: ES512 maps to curve P-521 per JOSE spec quirk). JWKS fetch coalesces concurrent requests into a single in-flight promise.
-- **Detect-and-throw on broken compat-shim middleware**. `expressCompat(bodyParser.json())`, `expressCompat(multer().single(...))`, `expressCompat(session(...))`, `expressCompat(compression())` now throw a `TypeError` at registration with a message naming the RiftExpress-native equivalent. Opt out with `expressCompat(mw, { allowKnownBroken: true })` to get a `process.emitWarning` instead.
-- **Header injection guard**. `ctx.set(name, value)` rejects values containing `\r` or `\n` immediately with `RiftexHeaderInjectionError` (500, code `HEADER_INJECTION`) — same for header names.
-- **`ctx.json()` safety on circular refs / BigInt / unserializable values**. Throws `RiftexUnserializableError` (500, code `UNSERIALIZABLE_RESPONSE`) with a structural reason instead of letting `JSON.stringify`'s `TypeError` bubble up as a generic 500. New `safeJsonStringify(value, opts?)` helper exported for lenient mode (handles circular refs as `[Circular]`, BigInt as JSON string).
+- **Detect-and-throw on broken compat-shim middleware**. `expressCompat(bodyParser.json())`, `expressCompat(multer().single(...))`, `expressCompat(session(...))`, `expressCompat(compression())` now throw a `TypeError` at registration with a message naming the Ingenium-native equivalent. Opt out with `expressCompat(mw, { allowKnownBroken: true })` to get a `process.emitWarning` instead.
+- **Header injection guard**. `ctx.set(name, value)` rejects values containing `\r` or `\n` immediately with `IngeniumHeaderInjectionError` (500, code `HEADER_INJECTION`) — same for header names.
+- **`ctx.json()` safety on circular refs / BigInt / unserializable values**. Throws `IngeniumUnserializableError` (500, code `UNSERIALIZABLE_RESPONSE`) with a structural reason instead of letting `JSON.stringify`'s `TypeError` bubble up as a generic 500. New `safeJsonStringify(value, opts?)` helper exported for lenient mode (handles circular refs as `[Circular]`, BigInt as JSON string).
 - **Idempotency-Key — skip caching 5xx by default**. `IdempotencyOptions.cacheable: (status) => boolean` (default `(s) => s >= 200 && s < 500`). Transient 500s no longer get replayed for the entire TTL; the in-flight promise resolves with `null` on uncacheable status so concurrent waiters fall through to a fresh handler run.
-- New error classes: `RiftexTimeoutError`, `RiftexHeaderInjectionError`, `RiftexUnserializableError`. New helper exports: `safeJsonStringify`, `fetchJwks`, `clearJwksCache`. New types: `JwtKey`.
+- New error classes: `IngeniumTimeoutError`, `IngeniumHeaderInjectionError`, `IngeniumUnserializableError`. New helper exports: `safeJsonStringify`, `fetchJwks`, `clearJwksCache`. New types: `JwtKey`.
 
 ### Changed
 
@@ -29,7 +29,7 @@ deferred items and likely-to-shift surfaces.
 
 ### Earlier in [Unreleased] — already shipped before this push
 
-- **CSRF protection.** Native `riftex.csrf(opts)` middleware (also exported as
+- **CSRF protection.** Native `ingenium.csrf(opts)` middleware (also exported as
   `csrfMiddleware`). Two storage modes:
   - `'cookie'` (default): double-submit cookie pattern with HMAC-SHA-256
     signing. Token written to a non-`HttpOnly` cookie on safe requests; client
@@ -37,7 +37,7 @@ deferred items and likely-to-shift surfaces.
     requests. Verified with `crypto.timingSafeEqual`. Secret rotation supported.
   - `'session'`: synchronizer pattern. Token stored on `ctx.session.csrfToken`,
     requires `sessionMiddleware` to run first.
-  - Failures throw `RiftexCsrfError` (HTTP 403, code `CSRF_FAILED`).
+  - Failures throw `IngeniumCsrfError` (HTTP 403, code `CSRF_FAILED`).
   - Token exposed via `ctx.csrfToken()` and `ctx.state.csrfToken` for embedding
     in HTML forms.
   - 23 unit tests across both modes, including timing-safe compare and rotation.
@@ -51,13 +51,13 @@ deferred items and likely-to-shift surfaces.
 
 ### Changed
 
-- Renamed `makeRexFactory` → `makeRiftexFactory` and `rexCore` → `riftexCore`
+- Renamed `makeRexFactory` → `makeIngeniumFactory` and `rexCore` → `ingeniumCore`
   (caught by post-rename sweep — the word-boundary script missed
   mid-camelCase tokens).
 
 ### Fixed
 
-- **Middleware now runs on trie misses.** `app.use(riftex.static(...))` and
+- **Middleware now runs on trie misses.** `app.use(ingenium.static(...))` and
   `app.use(corsMw)` patterns work correctly: when no route matches, a
   fallback chain composed of global + path-matching scoped middleware runs
   before the 404/405 surfaces. Previously a request to an unregistered
@@ -70,40 +70,40 @@ the production-grade middleware required for non-trivial deployments.
 
 ### Added
 
-- **App + Router.** `riftex()` factory, `RiftexApp`, mountable `Router` with prefix
+- **App + Router.** `ingenium()` factory, `IngeniumApp`, mountable `Router` with prefix
   composition, lazy middleware composition with a dirty-bit recompose, and
   `app.compose()` pre-warm.
 - **Routing.** Radix-trie router with deterministic precedence
   (static > `:param` > `*wildcard`), optional params (`:id?`), wildcard tails
   (`*path`), typed param extraction via `ExtractParams<Path>`.
-- **Context + body.** Pooled `RiftexContext`, lazy `URLSearchParams`, lazy
-  `RiftexBody` parsers (`json`, `text`, `urlencoded`, `buffer`, `stream`,
+- **Context + body.** Pooled `IngeniumContext`, lazy `URLSearchParams`, lazy
+  `IngeniumBody` parsers (`json`, `text`, `urlencoded`, `buffer`, `stream`,
   `multipart`). Body-parser default limit is **100,000 bytes** (matches
   Express's `body-parser` default).
-- **Multipart.** Native `RiftexBody.multipart()` for `multipart/form-data` with
+- **Multipart.** Native `IngeniumBody.multipart()` for `multipart/form-data` with
   per-file / per-field caps and an allow-list for MIME prefixes.
 - **Validation.** First-class
   [Standard Schema v1](https://standardschema.dev) detection in
-  `RiftexBody.json(schema)`, with fallbacks for Zod's `safeParse` and any
+  `IngeniumBody.json(schema)`, with fallbacks for Zod's `safeParse` and any
   `{ parse(input): T }` validator. Issues normalized into a
-  `RiftexValidationError` with a `fields` map.
+  `IngeniumValidationError` with a `fields` map.
 - **Response helpers.** `ctx.json/text/html/send/redirect/stream` plus
   return-value reflection (object → JSON, string → text/html, `Buffer` →
   octet-stream, `Readable` → stream, `undefined` → 204).
-- **Errors.** `RiftexError` hierarchy
-  (`RiftexNotFoundError`, `RiftexUnauthorizedError`, `RiftexMethodNotAllowedError`,
-  `RiftexPayloadTooLargeError`, `RiftexValidationError`, `RiftexBadRequestError`)
+- **Errors.** `IngeniumError` hierarchy
+  (`IngeniumNotFoundError`, `IngeniumUnauthorizedError`, `IngeniumMethodNotAllowedError`,
+  `IngeniumPayloadTooLargeError`, `IngeniumValidationError`, `IngeniumBadRequestError`)
   and an `app.onError(handler)` boundary that re-throws to delegate.
 - **Plugins.** `app.register(plugin, opts?)`, lifecycle hooks (`onRoute`,
   `onCompose`, `onRequest`, `onResponse`, `onError`), `app.decorate(name, fn)`
   (lazy) and `app.decorateRequest(name, fn)` (eager). Hot path
   short-circuits when no plugins are registered.
 - **Middleware (built-ins).**
-  - `riftex.json(opts?)` / `riftex.urlencoded(opts?)` — Express-compat no-ops
+  - `ingenium.json(opts?)` / `ingenium.urlencoded(opts?)` — Express-compat no-ops
     (parsing remains lazy via `ctx.body.*`).
-  - `riftex.static(root, opts?)` — ETag, conditional GET, range requests, MIME
+  - `ingenium.static(root, opts?)` — ETag, conditional GET, range requests, MIME
     detection, `index` / `extensions` / `dotfiles` / `maxAge` (ms).
-  - `riftex.cors(opts?)` — simple + preflight CORS with origin allowlist /
+  - `ingenium.cors(opts?)` — simple + preflight CORS with origin allowlist /
     regex / function, `Vary: Origin`, credentials guard against `*`.
   - `sessionMiddleware` — HMAC-signed cookie sessions, key rotation,
     `regenerate()`, pluggable store (default in-process), rolling TTL.
@@ -115,11 +115,11 @@ the production-grade middleware required for non-trivial deployments.
     close.
   - `Http2Adapter` — `h2` over TLS with optional ALPN HTTP/1.1 fallback.
   - `Http2cAdapter` — `h2c` cleartext for local / behind-proxy use.
-  - `BunAdapter` (`riftexpress-bun`) — `Bun.serve()` with WinterCG ↔
+  - `BunAdapter` (`ingenium-bun`) — `Bun.serve()` with WinterCG ↔
     `node:stream` body bridge.
-  - `WsNodeAdapter` (`riftexpress/ws`) — opt-in WebSocket support via the
+  - `WsNodeAdapter` (`ingenium/ws`) — opt-in WebSocket support via the
     optional `ws` peer dep, exposed through `enableWebSockets(app)`.
-- **Trust-proxy.** `RiftexAppOptions.trustProxy` mirroring Express's
+- **Trust-proxy.** `IngeniumAppOptions.trustProxy` mirroring Express's
   `app.set('trust proxy', ...)` semantics — booleans, hop counts, CIDRs,
   keywords (`loopback`, `linklocal`, `uniquelocal`), or a custom predicate.
   `ctx.ip`, `ctx.ips`, `ctx.protocol`, `ctx.hostname`, `ctx.secure` are
@@ -128,12 +128,12 @@ the production-grade middleware required for non-trivial deployments.
   SIGINT to drain the server, run a user `onShutdown` hook, and force-close
   idle keep-alive sockets after `gracefulTimeoutMs` (default 10 s, matching
   Kubernetes' default `terminationGracePeriodSeconds` headroom).
-- **Express compat shim** (`riftexpress-compat`). `expressCompat(mw)`
+- **Express compat shim** (`ingenium-compat`). `expressCompat(mw)`
   proxies pure-function `(req, res, next)` middleware (cors, helmet,
   morgan, compression). Documented incompatibilities in
   `docs/migration-guide.md`.
-- **CLI** (`riftexpress-cli`). `riftex new <name> [--bun|--minimal|--force]`
-  scaffolds a project. `riftex routes` is reserved for v0.2.
+- **CLI** (`ingenium-cli`). `ingenium new <name> [--bun|--minimal|--force]`
+  scaffolds a project. `ingenium routes` is reserved for v0.2.
 - **CI.** GitHub Actions matrix on Node 20 / 22 / 24 across Ubuntu and
   Windows; typecheck + Vitest run on every push.
 - **Architecture decision records.** `docs/adr/0001`–`0005` covering the
@@ -144,7 +144,7 @@ the production-grade middleware required for non-trivial deployments.
 
 - Body-parser default limit standardized to 100,000 bytes for `json` /
   `text` / `urlencoded` / `buffer` (was previously documented as 1 MiB
-  for `buffer` — see `packages/riftexpress/src/context/body.ts`).
+  for `buffer` — see `packages/ingenium/src/context/body.ts`).
 
 ### Deprecated
 
@@ -163,13 +163,13 @@ the production-grade middleware required for non-trivial deployments.
 - `sessionMiddleware` uses HMAC-SHA-256, `timingSafeEqual` verification,
   and 144-bit random ids. Tampered cookies silently issue a fresh session
   (no error response) so this surface is not an oracle.
-- `riftex.cors` rejects `credentials: true` combined with `origin: '*'` at
+- `ingenium.cors` rejects `credentials: true` combined with `origin: '*'` at
   construction time per the Fetch spec.
-- `riftex.static` resolves paths under `root` and rejects traversal; the
+- `ingenium.static` resolves paths under `root` and rejects traversal; the
   `dotfiles` policy defaults to `'ignore'`.
 - Default rate-limit `keyGenerator` reads `X-Forwarded-For` directly —
   see the JSDoc warning. Production deployments behind a proxy must
   configure `trustProxy` or supply a custom `keyGenerator`.
 
-[Unreleased]: https://github.com/riftexpress/riftexpress/compare/v0.1.0-alpha...HEAD
-[0.1.0-alpha]: https://github.com/riftexpress/riftexpress/releases/tag/v0.1.0-alpha
+[Unreleased]: https://github.com/ingenium/ingenium/compare/v0.1.0-alpha...HEAD
+[0.1.0-alpha]: https://github.com/ingenium/ingenium/releases/tag/v0.1.0-alpha

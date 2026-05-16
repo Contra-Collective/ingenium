@@ -1,4 +1,4 @@
-# RiftExpress
+# Ingenium
 
 > Express ergonomics, Hono/Fastify-class throughput. A typed HTTP framework for Node 20+ and Bun 1.1+.
 
@@ -11,7 +11,7 @@
                              |_|                     
 ```
 
-RiftExpress is what happens if you fix Express's three structural problems — linear routing, untyped `req`/`res`, and per-request allocation — without forcing developers to learn a new mental model. It's the same shape (`app.get`, `app.use`, mountable routers, drop-in middleware), with a typed `ctx` instead of `(req, res, next)`, and a router/dispatcher built for current-decade Node throughput.
+Ingenium is what happens if you fix Express's three structural problems — linear routing, untyped `req`/`res`, and per-request allocation — without forcing developers to learn a new mental model. It's the same shape (`app.get`, `app.use`, mountable routers, drop-in middleware), with a typed `ctx` instead of `(req, res, next)`, and a router/dispatcher built for current-decade Node throughput.
 
 **Status: alpha (v0.0.1).** API is mostly settled but still subject to change before 0.1.0. Use it for side projects and internal tools; revisit for production once 1.0 lands.
 
@@ -20,12 +20,12 @@ RiftExpress is what happens if you fix Express's three structural problems — l
 ## Table of contents
 
 - [Show me the code](#show-me-the-code)
-- [Why RiftExpress](#why-riftexpress)
+- [Why Ingenium](#why-ingenium)
 - [Install](#install)
-- [The 5-minute Express → RiftExpress diff](#the-5-minute-express--riftexpress-diff)
+- [The 5-minute Express → Ingenium diff](#the-5-minute-express--ingenium-diff)
 - [Core concepts](#core-concepts)
   - [App + Router](#app--router)
-  - [RiftexContext](#riftexcontext)
+  - [IngeniumContext](#ingeniumcontext)
   - [Middleware](#middleware)
   - [Body parsing](#body-parsing)
   - [Response reflection](#response-reflection)
@@ -33,12 +33,12 @@ RiftExpress is what happens if you fix Express's three structural problems — l
   - [Plugins](#plugins)
   - [Trust-proxy](#trust-proxy)
 - [Built-in middleware](#built-in-middleware)
-  - [`riftex.json` / `riftex.urlencoded`](#riftexjson--rexurlencoded)
-  - [`riftex.static`](#riftexstatic)
-  - [`riftex.cors`](#riftexcors)
-  - [`riftex.sse` (Server-Sent Events)](#riftexsse-server-sent-events)
-  - [`riftex.rateLimit`](#riftexratelimit)
-  - [`riftex.csrf`](#riftexcsrf)
+  - [`ingenium.json` / `ingenium.urlencoded`](#ingeniumjson--rexurlencoded)
+  - [`ingenium.static`](#ingeniumstatic)
+  - [`ingenium.cors`](#ingeniumcors)
+  - [`ingenium.sse` (Server-Sent Events)](#ingeniumsse-server-sent-events)
+  - [`ingenium.rateLimit`](#ingeniumratelimit)
+  - [`ingenium.csrf`](#ingeniumcsrf)
   - [`sessionMiddleware`](#sessionmiddleware)
 - [Transports](#transports)
   - [Node `http` (default)](#node-http-default)
@@ -64,9 +64,9 @@ RiftExpress is what happens if you fix Express's three structural problems — l
 ## Show me the code
 
 ```ts
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 
 app.use(async (ctx, next) => {
   const start = Date.now()
@@ -82,17 +82,17 @@ const server = await app.listen(3000)
 console.log(`listening on http://localhost:${server.port}`)
 ```
 
-That's a full server. No `res.send`. No `body-parser`. No `app.set('case sensitive routing', true)`. Return a value and RiftExpress reflects it to the wire — object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204. Call `ctx.json(...)` when you want explicit control over status or headers.
+That's a full server. No `res.send`. No `body-parser`. No `app.set('case sensitive routing', true)`. Return a value and Ingenium reflects it to the wire — object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204. Call `ctx.json(...)` when you want explicit control over status or headers.
 
 ---
 
-## Why RiftExpress
+## Why Ingenium
 
-| Pain point | Express | Hono / Fastify | RiftExpress |
+| Pain point | Express | Hono / Fastify | Ingenium |
 |---|---|---|---|
 | Router speed at 1000 routes | O(n) linear scan | O(k) trie | O(k) radix trie + wildcard backtrack |
 | `req` / `res` types | `any` in practice | strict, but unfamiliar surface | strict, Express-shaped |
-| Per-request allocation | new `req`/`res`/`next` each request | varies | pooled `RiftexContext`, lazy getters |
+| Per-request allocation | new `req`/`res`/`next` each request | varies | pooled `IngeniumContext`, lazy getters |
 | Middleware composition | re-walked per request | compose-on-register | lazy compose with dirty-bit recompose |
 | Body parsing | `body-parser` middleware always runs | always-on parsing | lazy via `ctx.body.json()` |
 | Default body size limit | 100 KB (`body-parser`) | varies | 100 KB (matches Express) |
@@ -109,37 +109,37 @@ Native primitives an API team actually needs in prod, all opt-in:
 
 | Concern | Surface | Why it matters |
 |---|---|---|
-| Per-request timeout ceiling | `riftex({ requestTimeoutMs: 30_000 })` → `RiftexTimeoutError` (503) | A handler that never resolves leaks the context, socket, and pool slot forever. |
-| Hard request-body cap | `riftex({ maxRequestBytes: 2_000_000 })` enforced at the **transport** layer | Default-100KB per-call check doesn't help if the handler reads via `ctx.body.stream()`. Cap is enforced before any consumer touches a byte. |
-| Header injection guard | `ctx.set(name, value)` rejects `\r\n` immediately → `RiftexHeaderInjectionError` | Catches CRLF injection at the call site instead of deep inside Node's wire path. |
-| `ctx.json()` safety on circular refs / BigInt | Throws `RiftexUnserializableError` (500) with the structural reason | No more useless `TypeError: Converting circular...` bubbling up as a generic 500. `safeJsonStringify(value)` exported for lenient mode. |
-| Idempotency-Key — skip caching 5xx | `riftex.idempotency({ cacheable: (s) => s < 500 })` (default) | A transient 500 no longer gets replayed for the entire TTL. |
+| Per-request timeout ceiling | `ingenium({ requestTimeoutMs: 30_000 })` → `IngeniumTimeoutError` (503) | A handler that never resolves leaks the context, socket, and pool slot forever. |
+| Hard request-body cap | `ingenium({ maxRequestBytes: 2_000_000 })` enforced at the **transport** layer | Default-100KB per-call check doesn't help if the handler reads via `ctx.body.stream()`. Cap is enforced before any consumer touches a byte. |
+| Header injection guard | `ctx.set(name, value)` rejects `\r\n` immediately → `IngeniumHeaderInjectionError` | Catches CRLF injection at the call site instead of deep inside Node's wire path. |
+| `ctx.json()` safety on circular refs / BigInt | Throws `IngeniumUnserializableError` (500) with the structural reason | No more useless `TypeError: Converting circular...` bubbling up as a generic 500. `safeJsonStringify(value)` exported for lenient mode. |
+| Idempotency-Key — skip caching 5xx | `ingenium.idempotency({ cacheable: (s) => s < 500 })` (default) | A transient 500 no longer gets replayed for the entire TTL. |
 | Compat shim — fail-loud on broken middleware | `expressCompat(bodyParser.json())` throws `TypeError` at registration | Silent failures of `express-session`, `multer`, `body-parser`, `compression` now point at the native equivalent. Opt out via `{ allowKnownBroken: true }`. |
-| Asymmetric JWT (RS/PS/ES + JWKS) | `riftex.jwt({ algorithms: ['RS256'], jwksUrl: '...' })` | Required for any IdP with a JWKS endpoint (Auth0, Okta, Cognito, Clerk, Supabase). Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally. |
-| Late-write protection | `_epoch` counter on `RiftexContext` — orphaned-handler writes after a timeout are detected and discarded | Stops cross-request response corruption when the pool recycles the context. |
+| Asymmetric JWT (RS/PS/ES + JWKS) | `ingenium.jwt({ algorithms: ['RS256'], jwksUrl: '...' })` | Required for any IdP with a JWKS endpoint (Auth0, Okta, Cognito, Clerk, Supabase). Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally. |
+| Late-write protection | `_epoch` counter on `IngeniumContext` — orphaned-handler writes after a timeout are detected and discarded | Stops cross-request response corruption when the pool recycles the context. |
 
 Wire all of these in production:
 
 ```ts
 import {
-  riftex, sessionMiddleware, gracefulShutdown,
+  ingenium, sessionMiddleware, gracefulShutdown,
   IdempotencyMemoryStore,
-} from 'riftexpress'
+} from 'ingenium'
 
-const app = riftex({
+const app = ingenium({
   trustProxy: 'loopback',                  // behind nginx / Caddy / etc.
   requestTimeoutMs: 30_000,                // hung-handler protection
   maxRequestBytes: 2 * 1024 * 1024,        // 2 MiB body ceiling
   poolSize: 4096,
 })
 
-app.use(riftex.cors({ origin: 'https://app.example.com', credentials: true }))
-app.use(riftex.csrf({ secret: process.env.CSRF_SECRET! }))
+app.use(ingenium.cors({ origin: 'https://app.example.com', credentials: true }))
+app.use(ingenium.csrf({ secret: process.env.CSRF_SECRET! }))
 app.use(sessionMiddleware({ secret: [process.env.SESSION_SECRET!] }))
-app.use(riftex.rateLimit({ windowMs: 60_000, limit: 100 }))
-app.use(riftex.idempotency({ store: new IdempotencyMemoryStore() }))   // swap for RedisIdempotencyStore (riftexpress-redis) for multi-instance
-app.use(riftex.problemDetails({ typeBaseUrl: 'https://api.example.com/errors/' }))
-app.use(riftex.jwt({
+app.use(ingenium.rateLimit({ windowMs: 60_000, limit: 100 }))
+app.use(ingenium.idempotency({ store: new IdempotencyMemoryStore() }))   // swap for RedisIdempotencyStore (ingenium-redis) for multi-instance
+app.use(ingenium.problemDetails({ typeBaseUrl: 'https://api.example.com/errors/' }))
+app.use(ingenium.jwt({
   algorithms: ['RS256'],
   jwksUrl: 'https://example.auth0.com/.well-known/jwks.json',
   issuer: 'https://example.auth0.com/',
@@ -150,45 +150,45 @@ const server = await app.listen(cfg.PORT, '0.0.0.0')
 gracefulShutdown(server, { gracefulTimeoutMs: 10_000, onShutdown: () => db.close() })
 ```
 
-> **Multi-instance deploys:** swap the in-memory stores for the Redis-backed ones in [`riftexpress-redis`](packages/riftexpress-redis). One `createClient()` instance, three drop-in stores, no API changes elsewhere. See the package [README](packages/riftexpress-redis/README.md) for the wire-in.
+> **Multi-instance deploys:** swap the in-memory stores for the Redis-backed ones in [`ingenium-redis`](packages/ingenium-redis). One `createClient()` instance, three drop-in stores, no API changes elsewhere. See the package [README](packages/ingenium-redis/README.md) for the wire-in.
 
 ---
 
 ## Install
 
 ```sh
-npm install riftexpress
+npm install ingenium
 ```
 
 Optional packages by use case:
 
 ```sh
 # Bun.serve adapter
-npm install riftexpress riftexpress-bun
+npm install ingenium ingenium-bun
 
 # Express middleware compatibility (cors, helmet, etc.)
-npm install riftexpress riftexpress-compat
+npm install ingenium ingenium-compat
 
 # Redis stores for multi-instance prod (sessions, idempotency, rate-limit)
-npm install riftexpress riftexpress-redis redis
+npm install ingenium ingenium-redis redis
 
 # Project scaffolder
-npm install -g riftexpress-cli
-riftex new my-api
+npm install -g ingenium-cli
+ingenium new my-api
 ```
 
 **Requirements:** Node 20+. Bun 1.1+ for the Bun adapter. WebSocket support requires installing `ws` as a peer dep.
 
 ---
 
-## The 5-minute Express → RiftExpress diff
+## The 5-minute Express → Ingenium diff
 
 ```ts
-// Express                                      // RiftExpress
-import express from 'express'                   import { riftex } from 'riftexpress'
-const app = express()                           const app = riftex()
+// Express                                      // Ingenium
+import express from 'express'                   import { ingenium } from 'ingenium'
+const app = express()                           const app = ingenium()
 
-app.use(express.json())                         app.use(riftex.json())  // (no-op, parsing is lazy)
+app.use(express.json())                         app.use(ingenium.json())  // (no-op, parsing is lazy)
 
 app.use((req, res, next) => {                   app.use(async (ctx, next) => {
   req.startedAt = Date.now()                      ctx.state.startedAt = Date.now()
@@ -205,7 +205,7 @@ app.post('/users', (req, res) => {              app.post('/users', async (ctx) =
   res.status(201).json(user)                      return ctx.json(user, 201)
 })                                              })
 
-const router = express.Router()                 const router = riftex.Router()
+const router = express.Router()                 const router = ingenium.Router()
 router.get('/health', (req, res) =>             router.get('/health', () => ({ ok: 1 }))
   res.json({ok:1}))
 app.use('/api', router)                         app.use('/api', router)
@@ -219,7 +219,7 @@ app.listen(3000)                                await app.listen(3000)
 
 Breakable changes:
 1. **Handlers may return values.** `return obj` is `res.json(obj)`; `return 'text'` is `res.text(...)`. Calling `ctx.json(...)` explicitly still works.
-2. **Body parsing is lazy.** `app.use(riftex.json())` is a no-op stub for ergonomics; the actual parse happens in `ctx.body.json()` inside your handler.
+2. **Body parsing is lazy.** `app.use(ingenium.json())` is a no-op stub for ergonomics; the actual parse happens in `ctx.body.json()` inside your handler.
 3. **`ctx.state` is the per-request scratch space**, not `ctx.user = ...` directly (though plugins can decorate `ctx` to enable that).
 
 That's the whole list. Everything else from the Express mental model carries over verbatim.
@@ -231,9 +231,9 @@ That's the whole list. Everything else from the Express mental model carries ove
 ### App + Router
 
 ```ts
-import { riftex, Router } from 'riftexpress'
+import { ingenium, Router } from 'ingenium'
 
-const app = riftex({ poolSize: 1024, trustProxy: false })
+const app = ingenium({ poolSize: 1024, trustProxy: false })
 
 // HTTP methods — same surface as Express
 app.get('/', handler)
@@ -266,10 +266,10 @@ await server.close({ gracefulTimeoutMs: 10_000 })
 
 **Composition timing.** Registration is journaled, not eagerly composed. The trie + composed handlers are built on first request (or via `app.compose()`). Adding routes after `listen()` sets a dirty bit and triggers recompose on the next request — tests that register routes per-test work without ceremony.
 
-### RiftexContext
+### IngeniumContext
 
 ```ts
-class RiftexContext<Params = Record<string, string>> {
+class IngeniumContext<Params = Record<string, string>> {
   // Request
   method: HttpMethod              // 'GET' | 'POST' | ...
   url: string                     // path + ?query
@@ -278,7 +278,7 @@ class RiftexContext<Params = Record<string, string>> {
   query: URLSearchParams          // lazy
   params: Params                  // route params
   headers: IncomingHttpHeaders    // lowercased per Node convention
-  body: RiftexBody                   // lazy parsers
+  body: IngeniumBody                   // lazy parsers
   state: Record<string, unknown>  // per-request scratch
 
   // Network info (trust-proxy aware)
@@ -311,7 +311,7 @@ The class is pool-bound: one instance per pool slot, reused across requests. `re
 ### Middleware
 
 ```ts
-type RiftexMiddleware = (ctx: RiftexContext, next: () => Promise<void>) => unknown | Promise<unknown>
+type IngeniumMiddleware = (ctx: IngeniumContext, next: () => Promise<void>) => unknown | Promise<unknown>
 ```
 
 Same dispatch model as Koa: `await next()` in the middle, do work before/after. Errors thrown anywhere in the chain bubble up to `app.onError`.
@@ -332,7 +332,7 @@ Default `maxBytes` is **100,000** (matches Express's `body-parser` default). Ove
 2. Zod-like `safeParse(input)`
 3. Plain `parse(input): T`
 
-Validation failures throw `RiftexValidationError` with a `fields` map. Body-too-large throws `RiftexPayloadTooLargeError` mid-stream (no post-buffer rejection).
+Validation failures throw `IngeniumValidationError` with a `fields` map. Body-too-large throws `IngeniumPayloadTooLargeError` mid-stream (no post-buffer rejection).
 
 ### Response reflection
 
@@ -351,37 +351,37 @@ If a `ctx.json/text/html/send/redirect/stream` helper has been called, the retur
 
 ```ts
 import {
-  RiftexError,
-  RiftexNotFoundError,        // 404
-  RiftexUnauthorizedError,    // 401
-  RiftexMethodNotAllowedError,// 405 (auto-thrown on path match + method miss)
-  RiftexPayloadTooLargeError, // 413
-  RiftexValidationError,      // 422 with .fields
-  RiftexBadRequestError,      // 400
-} from 'riftexpress'
+  IngeniumError,
+  IngeniumNotFoundError,        // 404
+  IngeniumUnauthorizedError,    // 401
+  IngeniumMethodNotAllowedError,// 405 (auto-thrown on path match + method miss)
+  IngeniumPayloadTooLargeError, // 413
+  IngeniumValidationError,      // 422 with .fields
+  IngeniumBadRequestError,      // 400
+} from 'ingenium'
 
 app.onError((err, ctx) => {
-  if (err instanceof RiftexValidationError) {
+  if (err instanceof IngeniumValidationError) {
     return ctx.json({ error: err.message, fields: err.fields }, 422)
   }
-  if (err instanceof RiftexError) throw err  // delegate to default boundary
+  if (err instanceof IngeniumError) throw err  // delegate to default boundary
   ctx.json({ error: 'internal' }, 500)
 })
 ```
 
-The default boundary serializes any `RiftexError` as `{ error, code, fields? }` with the right status. Unknown errors become 500s. `RiftexMethodNotAllowedError` writes the `Allow` response header automatically.
+The default boundary serializes any `IngeniumError` as `{ error, code, fields? }` with the right status. Unknown errors become 500s. `IngeniumMethodNotAllowedError` writes the `Allow` response header automatically.
 
 ### Plugins
 
 ```ts
-import { riftex, type RiftexPlugin } from 'riftexpress'
+import { ingenium, type IngeniumPlugin } from 'ingenium'
 
 interface User { id: string; email: string }
 
-const auth: RiftexPlugin<{ secret: string }> = (app, opts) => {
+const auth: IngeniumPlugin<{ secret: string }> = (app, opts) => {
   app.decorate('user', async (ctx) => {
     const token = ctx.headers.authorization?.split(' ')[1]
-    if (!token) throw new RiftexUnauthorizedError()
+    if (!token) throw new IngeniumUnauthorizedError()
     return verifyToken(token, opts.secret) as User
   })
   app.hooks.onRequest((ctx) => {
@@ -389,11 +389,11 @@ const auth: RiftexPlugin<{ secret: string }> = (app, opts) => {
   })
 }
 
-const app = riftex()
+const app = ingenium()
 await app.register(auth, { secret: process.env.JWT_SECRET! })
 
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     user: User
   }
 }
@@ -406,7 +406,7 @@ Lifecycle hooks: `onRoute`, `onCompose`, `onRequest`, `onResponse`, `onError`. D
 ### Trust-proxy
 
 ```ts
-const app = riftex({ trustProxy: 'loopback' })
+const app = ingenium({ trustProxy: 'loopback' })
 
 // Then in handlers:
 ctx.ip          // real client IP after walking the X-Forwarded-For chain
@@ -432,14 +432,14 @@ Mirrors Express's `app.set('trust proxy', ...)`:
 
 ## Built-in middleware
 
-### `riftex.json` / `riftex.urlencoded`
+### `ingenium.json` / `ingenium.urlencoded`
 
 Stub middleware for Express compatibility. Body parsing is lazy via `ctx.body.json()` / `ctx.body.urlencoded()`, so these are no-ops. They exist so existing Express migration code (`app.use(express.json())`) compiles and reads naturally.
 
-### `riftex.static`
+### `ingenium.static`
 
 ```ts
-app.use(riftex.static('./public', {
+app.use(ingenium.static('./public', {
   index: 'index.html',     // default; set false to disable
   maxAge: 60_000,          // ms — sets Cache-Control: public, max-age=60
   extensions: ['html'],    // try /foo + /foo.html when /foo not found
@@ -449,10 +449,10 @@ app.use(riftex.static('./public', {
 
 Ships with weak ETags (`W/"size-mtime"`), conditional GET (`If-None-Match` → 304), range requests (`Range: bytes=N-M` → 206), MIME from extension (extensible map), and path-traversal protection (`../etc/passwd` → 403).
 
-### `riftex.cors`
+### `ingenium.cors`
 
 ```ts
-app.use(riftex.cors({
+app.use(ingenium.cors({
   origin: 'https://app.example.com',  // or true | string[] | RegExp | (origin, ctx) => boolean | string | Promise<>
   methods: ['GET', 'POST', 'PUT'],    // default: GET HEAD PUT PATCH POST DELETE
   allowedHeaders: ['x-trace-id'],     // default: mirror Access-Control-Request-Headers
@@ -465,10 +465,10 @@ app.use(riftex.cors({
 
 Handles simple requests, preflights (responds 204 with negotiated methods/headers, does NOT call `next()`), and `Vary: Origin` whenever the origin is reflected from the request.
 
-### `riftex.sse` (Server-Sent Events)
+### `ingenium.sse` (Server-Sent Events)
 
 ```ts
-import { riftex, sse, startKeepAlive } from 'riftexpress'
+import { ingenium, sse, startKeepAlive } from 'ingenium'
 
 app.get('/events', (ctx) => {
   const stream = sse(ctx)
@@ -487,10 +487,10 @@ app.get('/events', (ctx) => {
 
 `SseStream` API: `send(event | string)`, `comment(text)`, `close()`, `closed: boolean`. Multi-line `data` is split per spec. Object data is JSON-stringified.
 
-### `riftex.rateLimit`
+### `ingenium.rateLimit`
 
 ```ts
-app.use(riftex.rateLimit({
+app.use(ingenium.rateLimit({
   windowMs: 60_000,
   limit: 100,
   // default keygen reads X-Forwarded-For — make sure trustProxy is set!
@@ -501,13 +501,13 @@ app.use(riftex.rateLimit({
 
 Fixed-window in-memory store (`MemoryStore`) by default, with cleanup interval `unref()`'d so it never holds the event loop alive. Pluggable via the `RateLimitStore` interface (Promise-returning so a Redis-backed store fits cleanly). Sets `X-RateLimit-{Limit,Remaining,Reset}` on every response and `Retry-After` on 429s.
 
-### `riftex.csrf`
+### `ingenium.csrf`
 
 ```ts
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
-app.use(riftex.csrf({
+const app = ingenium()
+app.use(ingenium.csrf({
   secret: process.env.CSRF_SECRET!,    // required for cookie storage
   storage: 'cookie',                    // 'cookie' (default) | 'session'
   cookie: { sameSite: 'lax', secure: true },
@@ -534,25 +534,25 @@ Two storage modes:
 - **`cookie`** (default, no session needed) — double-submit cookie pattern with HMAC-signed tokens. The token is written to a non-`HttpOnly` cookie on safe requests; the client must echo it back via `X-CSRF-Token` (or `X-XSRF-Token` for Angular, or `?_csrf=` query param) on unsafe requests. Same-origin policy + HMAC verification together prevent forgery.
 - **`session`** — synchronizer pattern. Token stored on `ctx.session.csrfToken`; submitted token compared against it. Requires `sessionMiddleware` to run first; throws a clear developer error if missing.
 
-Verification uses `crypto.timingSafeEqual`. Secret rotation supported (`secret: ['new', 'old']`). Failures throw `RiftexCsrfError` (HTTP 403, code `CSRF_FAILED`) which the default error boundary serializes; catch in `app.onError` for custom handling.
+Verification uses `crypto.timingSafeEqual`. Secret rotation supported (`secret: ['new', 'old']`). Failures throw `IngeniumCsrfError` (HTTP 403, code `CSRF_FAILED`) which the default error boundary serializes; catch in `app.onError` for custom handling.
 
 > **Sessioned apps should opt in to `storage: 'session'`.** The default is `'cookie'` because it's self-contained, but if you're already running `sessionMiddleware` the synchronizer pattern is simpler (one cookie instead of two, and rotating the session secret rotates CSRF protection automatically). We don't auto-detect because middleware order shouldn't change semantics. See [docs/api/csrf.md](docs/api/csrf.md#recommendation).
 
 ### `sessionMiddleware`
 
 ```ts
-import { sessionMiddleware, type Session } from 'riftexpress'
+import { sessionMiddleware, type Session } from 'ingenium'
 
 app.use(sessionMiddleware({
   secret: [process.env.SESSION_SECRET!, ...rotatedSecrets],
-  cookieName: 'riftex.sid',
+  cookieName: 'ingenium.sid',
   maxAgeSeconds: 7 * 86_400,
   rolling: false,
   cookie: { secure: true, sameSite: 'lax', httpOnly: true },
 }))
 
-declare module 'riftexpress' {
-  interface RiftexContext { session: Session }
+declare module 'ingenium' {
+  interface IngeniumContext { session: Session }
 }
 
 app.post('/login', async (ctx) => {
@@ -577,36 +577,36 @@ HMAC-SHA256-signed cookies, 18-byte (144-bit) ids, `crypto.timingSafeEqual` veri
 ### Node `http` (default)
 
 ```ts
-const app = riftex()
+const app = ingenium()
 const server = await app.listen(3000)
 ```
 
-Uses `node:http` directly. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to the `RiftexContext`, and the `RiftexContext` straight to the `ServerResponse`.
+Uses `node:http` directly. No translation layer to WinterCG `Request`/`Response` — adapter writes straight from `IncomingMessage` to the `IngeniumContext`, and the `IngeniumContext` straight to the `ServerResponse`.
 
 ### Bun.serve
 
 ```ts
-import { riftex } from 'riftexpress'
-import { BunAdapter } from 'riftexpress-bun'
+import { ingenium } from 'ingenium'
+import { BunAdapter } from 'ingenium-bun'
 
-const app = riftex({ transport: new BunAdapter() })
+const app = ingenium({ transport: new BunAdapter() })
 await app.listen(3000)
 ```
 
-Wraps `Bun.serve()` with a Web-Streams ↔ `node:stream` bridge so existing `RiftexBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called.
+Wraps `Bun.serve()` with a Web-Streams ↔ `node:stream` bridge so existing `IngeniumBody` parsers work unchanged. Lazy body — request body is not materialized unless `ctx.body.*` is called.
 
 ### HTTP/2 (h2 + h2c)
 
 ```ts
-import { riftex, Http2Adapter, Http2cAdapter } from 'riftexpress'
+import { ingenium, Http2Adapter, Http2cAdapter } from 'ingenium'
 import { readFileSync } from 'node:fs'
 
 // h2c (cleartext HTTP/2)
-const app = riftex({ transport: new Http2cAdapter() })
+const app = ingenium({ transport: new Http2cAdapter() })
 await app.listen(3000)
 
 // h2 (TLS)
-const tlsApp = riftex({
+const tlsApp = ingenium({
   transport: new Http2Adapter({
     cert: readFileSync('cert.pem'),
     key: readFileSync('key.pem'),
@@ -627,9 +627,9 @@ npm install ws @types/ws
 ```
 
 ```ts
-import { riftex, enableWebSockets } from 'riftexpress'
+import { ingenium, enableWebSockets } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 enableWebSockets(app)
 
 app.ws('/echo', (sock) => {
@@ -649,9 +649,9 @@ Uses `WebSocketServer({ noServer: true })` and hooks the `upgrade` event on the 
 ### Graceful shutdown
 
 ```ts
-import { riftex, gracefulShutdown } from 'riftexpress'
+import { ingenium, gracefulShutdown } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 const server = await app.listen(3000)
 
 gracefulShutdown(server, {
@@ -671,23 +671,23 @@ A second signal during shutdown → immediate `exit(1)` (force quit). Without gr
 ## Express compatibility shim
 
 ```sh
-npm install riftexpress riftexpress-compat cors helmet
+npm install ingenium ingenium-compat cors helmet
 ```
 
 ```ts
-import { riftex } from 'riftexpress'
-import { expressCompat } from 'riftexpress-compat'
+import { ingenium } from 'ingenium'
+import { expressCompat } from 'ingenium-compat'
 import cors from 'cors'
 import helmet from 'helmet'
 
-const app = riftex()
+const app = ingenium()
 app.use(expressCompat(cors({ origin: 'https://app.example.com' })))
 app.use(expressCompat(helmet()))
 ```
 
-The shim wraps `(req, res, next)` middleware so it can run inside a RiftExpress middleware chain. The `req` and `res` shims expose enough surface for header-stamping, cookie parsing, simple body work, and short-circuit responses.
+The shim wraps `(req, res, next)` middleware so it can run inside a Ingenium middleware chain. The `req` and `res` shims expose enough surface for header-stamping, cookie parsing, simple body work, and short-circuit responses.
 
-**Compatibility status** (validated end-to-end in `packages/riftexpress-compat/test/e2e.test.ts`):
+**Compatibility status** (validated end-to-end in `packages/ingenium-compat/test/e2e.test.ts`):
 
 | Middleware | Status | Notes |
 |---|---|---|
@@ -702,21 +702,21 @@ The shim wraps `(req, res, next)` middleware so it can run inside a RiftExpress 
 | `express-session` | unsupported | silently no-ops — use native `sessionMiddleware` |
 | `multer` | unsupported | owns the request stream — use native `ctx.body.multipart()` |
 
-Full matrix and failure modes in [`packages/riftexpress-compat/COMPATIBILITY.md`](packages/riftexpress-compat/COMPATIBILITY.md).
+Full matrix and failure modes in [`packages/ingenium-compat/COMPATIBILITY.md`](packages/ingenium-compat/COMPATIBILITY.md).
 
 ---
 
 ## CLI scaffolder
 
 ```sh
-npm install -g riftexpress-cli
+npm install -g ingenium-cli
 
-riftex new my-api                      # default template
-riftex new my-bun-api --bun            # uses BunAdapter
-riftex new tiny --minimal              # 10-line hello world
-riftex new my-api --force              # overwrite existing dir
-riftex --version
-riftex --help
+ingenium new my-api                      # default template
+ingenium new my-bun-api --bun            # uses BunAdapter
+ingenium new tiny --minimal              # 10-line hello world
+ingenium new my-api --force              # overwrite existing dir
+ingenium --version
+ingenium --help
 ```
 
 Templates ship with: `package.json`, `tsconfig.json`, `.gitignore`, `src/index.ts`, `README.md`. Zero runtime dependencies (only Node built-ins). Requires Node 22+ (uses `--experimental-strip-types`).
@@ -748,7 +748,7 @@ const User = {
 app.post('/users', async (ctx) => ctx.body.json(User))
 ```
 
-All three throw `RiftexValidationError` with a `fields: Record<string, string>` map on failure. Standard Schema v1 issues with structured paths are dot-joined (`['user', 'email']` → `'user.email'`).
+All three throw `IngeniumValidationError` with a `fields: Record<string, string>` map on failure. Standard Schema v1 issues with structured paths are dot-joined (`['user', 'email']` → `'user.email'`).
 
 ---
 
@@ -779,11 +779,11 @@ npm run dev
 
 | Package | Description |
 |---|---|
-| [`riftexpress`](packages/riftexpress) | Core framework — `riftex()`, `Router`, `RiftexContext`, plugins, static, CORS, SSE, rate-limit, sessions, multipart, transports |
-| [`riftexpress-compat`](packages/riftexpress-compat) | `expressCompat(mw)` shim for `(req, res, next)` middleware |
-| [`riftexpress-bun`](packages/riftexpress-bun) | `BunAdapter` — drop-in transport for `Bun.serve()` |
-| [`riftexpress-cli`](packages/riftexpress-cli) | `riftex new <name> [--bun\|--minimal]` scaffolder |
-| [`riftexpress-redis`](packages/riftexpress-redis) | `RedisSessionStore`, `RedisIdempotencyStore`, `RedisRateLimitStore` — required for multi-instance deployments |
+| [`ingenium`](packages/ingenium) | Core framework — `ingenium()`, `Router`, `IngeniumContext`, plugins, static, CORS, SSE, rate-limit, sessions, multipart, transports |
+| [`ingenium-compat`](packages/ingenium-compat) | `expressCompat(mw)` shim for `(req, res, next)` middleware |
+| [`ingenium-bun`](packages/ingenium-bun) | `BunAdapter` — drop-in transport for `Bun.serve()` |
+| [`ingenium-cli`](packages/ingenium-cli) | `ingenium new <name> [--bun\|--minimal]` scaffolder |
+| [`ingenium-redis`](packages/ingenium-redis) | `RedisSessionStore`, `RedisIdempotencyStore`, `RedisRateLimitStore` — required for multi-instance deployments |
 
 Each package is independently publishable to npm.
 
@@ -795,7 +795,7 @@ Each package is independently publishable to npm.
 |---|---|
 | [`examples/learn`](examples/learn) | **Start here.** 8-step progressive tutorial — one concept per file, ~30 minutes end-to-end |
 | [`examples/basic`](examples/basic) | Hello world, params, body, error handler, graceful shutdown, static files, decorator |
-| [`examples/migrate-from-express`](examples/migrate-from-express) | Express version + RiftExpress version side by side, identical routes |
+| [`examples/migrate-from-express`](examples/migrate-from-express) | Express version + Ingenium version side by side, identical routes |
 | [`examples/with-plugin`](examples/with-plugin) | Custom auth plugin, decorator, hooks, module augmentation |
 | [`examples/with-bun`](examples/with-bun) | `BunAdapter` for `Bun.serve()` |
 
@@ -816,12 +816,12 @@ Five [Architecture Decision Records](docs/adr/) document the load-bearing choice
 ## Repo layout
 
 ```
-riftexpress/
+ingenium/
 ├── packages/
-│   ├── riftexpress/              # core
-│   ├── riftexpress-compat/       # Express middleware shim
-│   ├── riftexpress-bun/          # Bun.serve adapter
-│   └── riftexpress-cli/          # riftex new scaffolder
+│   ├── ingenium/              # core
+│   ├── ingenium-compat/       # Express middleware shim
+│   ├── ingenium-bun/          # Bun.serve adapter
+│   └── ingenium-cli/          # ingenium new scaffolder
 ├── apps/
 │   └── notes-api/                # reference CRUD service
 ├── examples/
@@ -854,15 +854,15 @@ riftexpress/
 ## Development
 
 ```sh
-git clone https://github.com/Contra-Collective/riftexpress.git
-cd riftexpress
+git clone https://github.com/Contra-Collective/ingenium.git
+cd ingenium
 npm install
 
 npm run typecheck          # tsc --noEmit across all workspaces
 npm test                   # vitest run
 
 # build the publishable core to dist/
-npm run build --workspace packages/riftexpress
+npm run build --workspace packages/ingenium
 
 # run a benchmark scenario
 cd benchmarks
@@ -902,4 +902,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and the relevant [ADR](docs/adr/) before
 
 ## License
 
-[MIT](LICENSE) © RiftExpress contributors.
+[MIT](LICENSE) © Ingenium contributors.

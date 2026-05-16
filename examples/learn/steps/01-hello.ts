@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  Step 1 — Hello, RiftExpress.
+//  Step 1 — Hello, Ingenium.
 //
-//  Concept: every RiftExpress app starts with `riftex()`. Handlers receive
+//  Concept: every Ingenium app starts with `ingenium()`. Handlers receive
 //  a single `ctx` (not `req` / `res`), and whatever you return is reflected
 //  to the wire — string → text, object → JSON, undefined → 204.
 //
@@ -9,9 +9,9 @@
 //  Try it:     curl http://localhost:3000
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 
-const app = riftex()
+const app = ingenium()
 
 app.get('/', () => 'hello, world')
 

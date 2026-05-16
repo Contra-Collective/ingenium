@@ -5,7 +5,7 @@
 //   - `ctx.requireAuth()` — guard that throws 401 if `ctx.user` is null
 // The plugin uses module augmentation so handlers see the typed surface.
 
-import { RiftexUnauthorizedError, type RiftexPlugin } from 'riftexpress'
+import { IngeniumUnauthorizedError, type IngeniumPlugin } from 'ingenium'
 import { prepared, type DB } from './db.ts'
 
 export interface AuthUser {
@@ -15,10 +15,10 @@ export interface AuthUser {
   created_at: number
 }
 
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     user: AuthUser | null
-    /** Throws RiftexUnauthorizedError unless a valid bearer token is presented. */
+    /** Throws IngeniumUnauthorizedError unless a valid bearer token is presented. */
     requireAuth: () => AuthUser
   }
 }
@@ -29,7 +29,7 @@ export interface AuthPluginOpts {
 
 const BEARER = /^Bearer\s+(.+)$/i
 
-export const authPlugin: RiftexPlugin<AuthPluginOpts> = (app, opts) => {
+export const authPlugin: IngeniumPlugin<AuthPluginOpts> = (app, opts) => {
   const stmts = prepared(opts.db)
 
   // Lazy: most requests don't read `ctx.user` (think /health). When they do,
@@ -45,7 +45,7 @@ export const authPlugin: RiftexPlugin<AuthPluginOpts> = (app, opts) => {
 
   app.decorate('requireAuth', (ctx) => (): AuthUser => {
     const u = ctx.user
-    if (!u) throw new RiftexUnauthorizedError('Authentication required')
+    if (!u) throw new IngeniumUnauthorizedError('Authentication required')
     return u
   })
 }

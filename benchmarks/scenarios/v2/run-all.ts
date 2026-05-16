@@ -7,7 +7,7 @@ const srv = (name: string) => resolve(here, '_servers', name)
 
 console.log('')
 console.log('=========================================================================')
-console.log(' RiftExpress bench v2 — multi-framework, multi-process, multi-sample')
+console.log(' Ingenium bench v2 — multi-framework, multi-process, multi-sample')
 console.log('=========================================================================')
 console.log('')
 console.log(`DISCLAIMER: ${DISCLAIMER}`)
@@ -22,7 +22,7 @@ await runScenario(
     { name: 'Express', file: srv('express-hello.ts') },
     { name: 'Fastify', file: srv('fastify-hello.ts') },
     { name: 'Hono', file: srv('hono-hello.ts') },
-    { name: 'RiftExpress', file: srv('rift-hello.ts') },
+    { name: 'Ingenium', file: srv('rift-hello.ts') },
   ],
 )
 
@@ -32,7 +32,7 @@ await runScenario(
     { name: 'Express', file: srv('express-body.ts'), path: '/echo', method: 'POST', body, headers },
     { name: 'Fastify', file: srv('fastify-body.ts'), path: '/echo', method: 'POST', body, headers },
     { name: 'Hono', file: srv('hono-body.ts'), path: '/echo', method: 'POST', body, headers },
-    { name: 'RiftExpress', file: srv('rift-body.ts'), path: '/echo', method: 'POST', body, headers },
+    { name: 'Ingenium', file: srv('rift-body.ts'), path: '/echo', method: 'POST', body, headers },
   ],
 )
 
@@ -42,7 +42,7 @@ await runScenario(
     { name: 'Express', file: srv('express-middleware.ts') },
     { name: 'Fastify', file: srv('fastify-middleware.ts') },
     { name: 'Hono', file: srv('hono-middleware.ts') },
-    { name: 'RiftExpress', file: srv('rift-middleware.ts') },
+    { name: 'Ingenium', file: srv('rift-middleware.ts') },
   ],
 )
 

@@ -1,16 +1,16 @@
 # Example: plugin system
 
-A minimal RiftExpress server that demonstrates the plugin API.
+A minimal Ingenium server that demonstrates the plugin API.
 
 What it shows:
 
-- Defining a plugin with the `RiftexPlugin<Opts>` type signature
+- Defining a plugin with the `IngeniumPlugin<Opts>` type signature
 - Registering it via `app.register(plugin, opts)`
 - Adding an `onRequest` lifecycle hook for token validation
 - Lazy `app.decorate('user', ...)` — factory runs the first time `ctx.user` is read
 - Lazy `app.decorate('requireAuth', ...)` — returning a function for guard usage
 - Eager `app.decorateRequest('requestId', ...)` — runs at the start of every request
-- The `declare module 'riftexpress'` augmentation pattern so decorated props show up in TypeScript intellisense
+- The `declare module 'ingenium'` augmentation pattern so decorated props show up in TypeScript intellisense
 
 ## Run
 

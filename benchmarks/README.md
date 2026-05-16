@@ -1,6 +1,6 @@
-# RiftExpress Benchmarks
+# Ingenium Benchmarks
 
-Local regression benchmarks comparing RiftExpress against Express on identical
+Local regression benchmarks comparing Ingenium against Express on identical
 workloads. Each scenario boots both frameworks on ephemeral `127.0.0.1` ports,
 runs `autocannon` against each, and prints a side-by-side comparison.
 
@@ -53,7 +53,7 @@ CPU:           <model, base GHz, core count>
 Memory:        <GB, type, speed>
 OS:            <name + version>
 Node version:  <e.g. 20.18.0>
-RiftExpress:   <commit SHA from packages/riftexpress>
+Ingenium:   <commit SHA from packages/ingenium>
 Express:       <version pinned in benchmarks/package.json>
 Background load: <what else was running on the machine>
 Power profile: <e.g. plugged in, performance mode, no throttling>
@@ -78,16 +78,16 @@ Power profile: <e.g. plugged in, performance mode, no throttling>
 
 ### What this suite is for
 
-- Catching regressions in the RiftExpress core during development.
+- Catching regressions in the Ingenium core during development.
 - Sanity-checking that a change didn't accidentally make the hot path slower.
-- Comparing two RiftExpress commits against each other (run the suite on
+- Comparing two Ingenium commits against each other (run the suite on
   baseline, then on the change branch, diff the tables).
 
 ### What this suite is NOT for
 
 - Marketing claims.
 - Cross-framework leaderboards.
-- Decisions about adopting RiftExpress in production.
+- Decisions about adopting Ingenium in production.
 
 For any of those, use a dedicated benchmark harness on isolated hardware with
 multiple frameworks at their latest pinned versions, multiple runs, std-dev

@@ -1,18 +1,18 @@
 # Built-in middleware
 
-Everything below ships in the core `'riftexpress'` package — no extra installs. Most are exposed as static helpers on the `riftex` factory (`riftex.json`, `riftex.cors`, `riftex.static`, `riftex.sse`, `riftex.rateLimit`); a few are named exports (`sessionMiddleware`, `startKeepAlive`).
+Everything below ships in the core `'ingenium'` package — no extra installs. Most are exposed as static helpers on the `ingenium` factory (`ingenium.json`, `ingenium.cors`, `ingenium.static`, `ingenium.sse`, `ingenium.rateLimit`); a few are named exports (`sessionMiddleware`, `startKeepAlive`).
 
-## `riftex.json(opts?)` and `riftex.urlencoded(opts?)`
+## `ingenium.json(opts?)` and `ingenium.urlencoded(opts?)`
 
 ```ts
-riftex.json(opts?: { limit?: number }): RiftexMiddleware
-riftex.urlencoded(opts?: { limit?: number }): RiftexMiddleware
+ingenium.json(opts?: { limit?: number }): IngeniumMiddleware
+ingenium.urlencoded(opts?: { limit?: number }): IngeniumMiddleware
 ```
 
-**Both are zero-cost no-op stubs.** Body parsing in RiftExpress is lazy — `ctx.body.json()` and `ctx.body.urlencoded()` parse on demand. These factories exist so existing Express migration code (`app.use(express.json())`) compiles and reads naturally without rewriting. The `limit` option is currently ignored; pass `maxBytes` directly to the body method instead.
+**Both are zero-cost no-op stubs.** Body parsing in Ingenium is lazy — `ctx.body.json()` and `ctx.body.urlencoded()` parse on demand. These factories exist so existing Express migration code (`app.use(express.json())`) compiles and reads naturally without rewriting. The `limit` option is currently ignored; pass `maxBytes` directly to the body method instead.
 
 ```ts
-app.use(riftex.json())                    // no-op
+app.use(ingenium.json())                    // no-op
 app.post('/users', async (ctx) => {
   const body = await ctx.body.json(undefined, 5_000_000)  // 5 MiB cap here
   // ...
@@ -21,10 +21,10 @@ app.post('/users', async (ctx) => {
 
 ---
 
-## `riftex.static(root, opts?)`
+## `ingenium.static(root, opts?)`
 
 ```ts
-riftex.static(root: string, opts?: StaticOptions): RiftexMiddleware
+ingenium.static(root: string, opts?: StaticOptions): IngeniumMiddleware
 ```
 
 Serve files from a directory.
@@ -50,9 +50,9 @@ interface StaticOptions {
 - **Dotfile policy** — `'ignore'` (default) calls `next()` so routes can 404, `'deny'` returns 403, `'allow'` serves normally.
 
 ```ts
-app.use(riftex.static('./public'))
+app.use(ingenium.static('./public'))
 
-app.use('/assets', riftex.static('./public', {
+app.use('/assets', ingenium.static('./public', {
   maxAge: 60_000,
   extensions: ['html'],
   dotfiles: 'deny',
@@ -63,10 +63,10 @@ Known gap: HEAD requests on static files currently fall through to `next()` inst
 
 ---
 
-## `riftex.cors(opts?)`
+## `ingenium.cors(opts?)`
 
 ```ts
-riftex.cors(opts?: CorsOptions): RiftexMiddleware
+ingenium.cors(opts?: CorsOptions): IngeniumMiddleware
 ```
 
 Handle simple requests, preflights, and `Vary: Origin` whenever the origin is reflected from the request.
@@ -91,14 +91,14 @@ type CorsOrigin =
   | RegExp                              // tested against request Origin
   | CorsOriginFn
 
-type CorsOriginFn = (origin: string, ctx: RiftexContext) =>
+type CorsOriginFn = (origin: string, ctx: IngeniumContext) =>
   boolean | string | Promise<boolean | string>
 ```
 
 Preflight (`OPTIONS` with `Access-Control-Request-Method`) is handled inline: the middleware writes the negotiated response and does NOT call `next()`. Simple requests get the appropriate `Access-Control-*` headers stamped before the chain continues.
 
 ```ts
-app.use(riftex.cors({
+app.use(ingenium.cors({
   origin: ['https://app.example.com', 'https://admin.example.com'],
   credentials: true,
   exposedHeaders: ['x-trace-id'],
@@ -108,13 +108,13 @@ app.use(riftex.cors({
 
 ---
 
-## `riftex.sse(ctx)` and `startKeepAlive(stream, intervalMs?)`
+## `ingenium.sse(ctx)` and `startKeepAlive(stream, intervalMs?)`
 
 ```ts
-import { sse, startKeepAlive } from 'riftexpress'
-// or via the factory: riftex.sse(ctx)
+import { sse, startKeepAlive } from 'ingenium'
+// or via the factory: ingenium.sse(ctx)
 
-function sse(ctx: RiftexContext): SseStream
+function sse(ctx: IngeniumContext): SseStream
 function startKeepAlive(stream: SseStream, intervalMs?: number): () => void
 ```
 
@@ -150,7 +150,7 @@ Send a `:keepalive` comment frame every `intervalMs` ms. Returns a cancel functi
 
 ```ts
 app.get('/events', (ctx) => {
-  const stream = riftex.sse(ctx)
+  const stream = ingenium.sse(ctx)
   const cancel = startKeepAlive(stream, 15_000)
 
   let n = 0
@@ -163,10 +163,10 @@ app.get('/events', (ctx) => {
 
 ---
 
-## `riftex.rateLimit(opts?)`
+## `ingenium.rateLimit(opts?)`
 
 ```ts
-riftex.rateLimit(opts?: RateLimitOptions): RiftexMiddleware
+ingenium.rateLimit(opts?: RateLimitOptions): IngeniumMiddleware
 ```
 
 Fixed-window in-memory rate limiter. Each key is allowed at most `max` requests per `windowMs`. Over-limit responses return 429 with `Retry-After` and a JSON body. Passing responses get `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (unix seconds).
@@ -177,8 +177,8 @@ Fixed-window in-memory rate limiter. Each key is allowed at most `max` requests 
 interface RateLimitOptions {
   windowMs?: number                                       // default 60_000
   max?: number                                            // default 100
-  keyGenerator?: (ctx: RiftexContext) => string           // default reads X-Forwarded-For, then X-Real-IP, then 'unknown'
-  skip?: (ctx: RiftexContext) => boolean                  // default: never skip
+  keyGenerator?: (ctx: IngeniumContext) => string           // default reads X-Forwarded-For, then X-Real-IP, then 'unknown'
+  skip?: (ctx: IngeniumContext) => boolean                  // default: never skip
   store?: RateLimitStore                                  // default: in-process MemoryStore
 }
 
@@ -194,13 +194,13 @@ The default `MemoryStore` is exported as `RateLimitMemoryStore` for tests. Its c
 
 The default `keyGenerator` reads `X-Forwarded-For` (first hop) then `X-Real-IP`. **Without an upstream proxy that strips client-supplied values, both headers are forgeable** — an attacker can rotate `X-Forwarded-For: <random>` per request and never get rate-limited. In production behind a proxy:
 
-- Set `trustProxy` on the app (`riftex({ trustProxy: 'loopback' })` for a local-only proxy).
+- Set `trustProxy` on the app (`ingenium({ trustProxy: 'loopback' })` for a local-only proxy).
 - Either supply a `keyGenerator: (ctx) => ctx.ip` (which will then walk the chain per your trust policy), or use a CIDR/keyword `trustProxy` that matches your actual edge.
 
 Throws at construction if `windowMs <= 0` or `max <= 0`.
 
 ```ts
-app.use(riftex.rateLimit({
+app.use(ingenium.rateLimit({
   windowMs: 60_000,
   max: 100,
   keyGenerator: (ctx) => ctx.ip,
@@ -213,9 +213,9 @@ app.use(riftex.rateLimit({
 ## `sessionMiddleware(opts)`
 
 ```ts
-import { sessionMiddleware, type Session } from 'riftexpress'
+import { sessionMiddleware, type Session } from 'ingenium'
 
-function sessionMiddleware(opts: SessionOptions): RiftexMiddleware
+function sessionMiddleware(opts: SessionOptions): IngeniumMiddleware
 ```
 
 Cookie-backed session middleware. HMAC-SHA256-signed session ids (18 random bytes / 144 bits), `crypto.timingSafeEqual` verification, secret rotation, in-process default store.
@@ -225,7 +225,7 @@ Cookie-backed session middleware. HMAC-SHA256-signed session ids (18 random byte
 ```ts
 interface SessionOptions {
   secret: string | string[]              // index 0 signs; all entries verify (rotation)
-  cookieName?: string                    // default 'riftex.sid'
+  cookieName?: string                    // default 'ingenium.sid'
   maxAgeSeconds?: number                 // default 604_800 (7 days)
   rolling?: boolean                      // default false; refresh expiry on every request
   cookie?: SessionCookieOptions
@@ -273,15 +273,15 @@ The default `SessionMemoryStore` is exported for tests. Swap in Redis/Postgres f
 ### Module-augmentation pattern for typed `ctx.session`
 
 ```ts
-import { sessionMiddleware, type Session } from 'riftexpress'
+import { sessionMiddleware, type Session } from 'ingenium'
 
-declare module 'riftexpress' {
-  interface RiftexContext {
+declare module 'ingenium' {
+  interface IngeniumContext {
     session: Session
   }
 }
 
-const app = riftex()
+const app = ingenium()
 app.use(sessionMiddleware({
   secret: [process.env.SESSION_SECRET!, ...rotatedSecrets],
   cookie: { secure: true, sameSite: 'lax', httpOnly: true },

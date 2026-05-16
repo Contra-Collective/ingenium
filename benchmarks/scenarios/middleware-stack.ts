@@ -1,5 +1,5 @@
 import express from 'express'
-import { riftex } from 'riftexpress'
+import { ingenium } from 'ingenium'
 import { runBench, printComparison, printHeader } from './_shared.js'
 
 const HOST = '127.0.0.1'
@@ -39,7 +39,7 @@ async function bootExpress(): Promise<{ port: number; close: () => Promise<void>
 }
 
 async function bootRift(): Promise<{ port: number; close: () => Promise<void> }> {
-  const app = riftex()
+  const app = ingenium()
   for (let i = 1; i <= LAYERS; i++) {
     const key = `layer${i}`
     app.use(async (ctx, next) => {
@@ -63,14 +63,14 @@ async function main() {
 
   try {
     console.log(`Express listening on http://${HOST}:${expressServer.port}`)
-    console.log(`RiftExpress listening on http://${HOST}:${riftServer.port}`)
+    console.log(`Ingenium listening on http://${HOST}:${riftServer.port}`)
     console.log('Running Express benchmark...')
     const expressResult = await runBench({
       url: `http://${HOST}:${expressServer.port}/`,
       connections: CONNECTIONS,
       duration: DURATION,
     })
-    console.log('Running RiftExpress benchmark...')
+    console.log('Running Ingenium benchmark...')
     const riftResult = await runBench({
       url: `http://${HOST}:${riftServer.port}/`,
       connections: CONNECTIONS,

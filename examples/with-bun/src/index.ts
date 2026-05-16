@@ -1,14 +1,14 @@
-// RiftExpress on Bun.
+// Ingenium on Bun.
 //
-// The framework is transport-agnostic — `riftex({ transport: ... })` lets you
+// The framework is transport-agnostic — `ingenium({ transport: ... })` lets you
 // swap the underlying server. `BunAdapter` runs on `Bun.serve()` instead of
-// `node:http`. Same handler surface, same `RiftexContext`, same return-value
+// `node:http`. Same handler surface, same `IngeniumContext`, same return-value
 // reflection. You must run this file with `bun`, not `node`.
 
-import { riftex } from 'riftexpress'
-import { BunAdapter } from 'riftexpress-bun'
+import { ingenium } from 'ingenium'
+import { BunAdapter } from 'ingenium-bun'
 
-const app = riftex({ transport: new BunAdapter() })
+const app = ingenium({ transport: new BunAdapter() })
 
 app.get('/', () => ({ hello: 'world', runtime: 'bun' }))
 

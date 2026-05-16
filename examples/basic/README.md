@@ -1,8 +1,8 @@
-# riftexpress-example-basic
+# ingenium-example-basic
 
-A minimal RiftExpress hello-world server showing middleware, route params, JSON body parsing, and the error boundary. Run from this directory with `npm run dev` (uses `tsx`, so any Node 20+ works). The server listens on port 3000 and exposes:
+A minimal Ingenium hello-world server showing middleware, route params, JSON body parsing, and the error boundary. Run from this directory with `npm run dev` (uses `tsx`, so any Node 20+ works). The server listens on port 3000 and exposes:
 
-- `GET /` — returns the string `Hello from RiftExpress` (text/plain)
+- `GET /` — returns the string `Hello from Ingenium` (text/plain)
 - `GET /users/:id` — returns `{ "id": "<param>" }` as JSON
 - `POST /echo` — parses the JSON body and echoes it back as `{ "youSent": ... }`
 

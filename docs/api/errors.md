@@ -1,23 +1,23 @@
 # Errors
 
-Every framework-emitted error extends `RiftexError`. The default error boundary serializes any `RiftexError` as `{ error, code, fields? }` with the matching HTTP status. Anything else becomes a 500.
+Every framework-emitted error extends `IngeniumError`. The default error boundary serializes any `IngeniumError` as `{ error, code, fields? }` with the matching HTTP status. Anything else becomes a 500.
 
 ```ts
 import {
-  RiftexError,
-  RiftexNotFoundError,
-  RiftexUnauthorizedError,
-  RiftexMethodNotAllowedError,
-  RiftexPayloadTooLargeError,
-  RiftexValidationError,
-  RiftexBadRequestError,
-} from 'riftexpress'
+  IngeniumError,
+  IngeniumNotFoundError,
+  IngeniumUnauthorizedError,
+  IngeniumMethodNotAllowedError,
+  IngeniumPayloadTooLargeError,
+  IngeniumValidationError,
+  IngeniumBadRequestError,
+} from 'ingenium'
 ```
 
-## `RiftexError` — base class
+## `IngeniumError` — base class
 
 ```ts
-class RiftexError extends Error {
+class IngeniumError extends Error {
   readonly statusCode: number
   readonly code: string                  // UPPER_SNAKE_CASE
   readonly cause?: unknown
@@ -29,21 +29,21 @@ class RiftexError extends Error {
 
 ## Built-in subclasses
 
-### `RiftexNotFoundError` — 404
+### `IngeniumNotFoundError` — 404
 
 ```ts
-class RiftexNotFoundError extends RiftexError {
+class IngeniumNotFoundError extends IngeniumError {
   constructor(message?: string)  // default 'Not Found'
 }
 // statusCode 404, code 'NOT_FOUND'
 ```
 
-Thrown by the framework when no route matches the request path. Override the message to expose more context (`new RiftexNotFoundError('User not found')`).
+Thrown by the framework when no route matches the request path. Override the message to expose more context (`new IngeniumNotFoundError('User not found')`).
 
-### `RiftexUnauthorizedError` — 401
+### `IngeniumUnauthorizedError` — 401
 
 ```ts
-class RiftexUnauthorizedError extends RiftexError {
+class IngeniumUnauthorizedError extends IngeniumError {
   constructor(message?: string)  // default 'Unauthorized'
 }
 // statusCode 401, code 'UNAUTHORIZED'
@@ -51,10 +51,10 @@ class RiftexUnauthorizedError extends RiftexError {
 
 Throw from auth middleware or decorators when the request lacks valid credentials.
 
-### `RiftexMethodNotAllowedError` — 405
+### `IngeniumMethodNotAllowedError` — 405
 
 ```ts
-class RiftexMethodNotAllowedError extends RiftexError {
+class IngeniumMethodNotAllowedError extends IngeniumError {
   readonly allowed: readonly string[]
   constructor(allowed: readonly string[], message?: string)  // default 'Method Not Allowed'
 }
@@ -63,10 +63,10 @@ class RiftexMethodNotAllowedError extends RiftexError {
 
 Thrown when a route path matched but no handler is registered for the request's method. The default boundary writes the `Allow` response header from `allowed` automatically (`'GET, POST, OPTIONS'`-style).
 
-### `RiftexPayloadTooLargeError` — 413
+### `IngeniumPayloadTooLargeError` — 413
 
 ```ts
-class RiftexPayloadTooLargeError extends RiftexError {
+class IngeniumPayloadTooLargeError extends IngeniumError {
   constructor(message?: string)  // default 'Payload Too Large'
 }
 // statusCode 413, code 'PAYLOAD_TOO_LARGE'
@@ -74,10 +74,10 @@ class RiftexPayloadTooLargeError extends RiftexError {
 
 Thrown by `ctx.body.json/text/urlencoded/buffer/multipart` when the body exceeds `maxBytes`, or by `ctx.body.multipart` when a single file exceeds `maxFileSize`.
 
-### `RiftexValidationError` — 422
+### `IngeniumValidationError` — 422
 
 ```ts
-class RiftexValidationError extends RiftexError {
+class IngeniumValidationError extends IngeniumError {
   readonly fields: Record<string, string>
   constructor(fields: Record<string, string>, message?: string)  // default 'Validation Failed'
 }
@@ -86,10 +86,10 @@ class RiftexValidationError extends RiftexError {
 
 Thrown by `ctx.body.json(schema)` when the parsed value fails validation. Each entry in `fields` maps a dot-joined field path to a human-readable message; the empty path becomes `'_'`. The `fields` map is included in the default boundary's serialized response.
 
-### `RiftexBadRequestError` — 400
+### `IngeniumBadRequestError` — 400
 
 ```ts
-class RiftexBadRequestError extends RiftexError {
+class IngeniumBadRequestError extends IngeniumError {
   constructor(message?: string, cause?: unknown)  // default 'Bad Request'
 }
 // statusCode 400, code 'BAD_REQUEST'
@@ -100,30 +100,30 @@ Thrown for malformed input — invalid JSON, body already consumed, missing body
 ## Default boundary
 
 ```jsonc
-// status: <RiftexError.statusCode>
+// status: <IngeniumError.statusCode>
 // content-type: application/json; charset=utf-8
 {
   "error": "<message>",
   "code":  "<CODE>",
-  "fields": { /* present only on RiftexValidationError */ }
+  "fields": { /* present only on IngeniumValidationError */ }
 }
 ```
 
-For unknown errors (anything not extending `RiftexError`), the boundary writes a 500 with `{ error: <message-or-fallback>, code: 'INTERNAL_ERROR' }`.
+For unknown errors (anything not extending `IngeniumError`), the boundary writes a 500 with `{ error: <message-or-fallback>, code: 'INTERNAL_ERROR' }`.
 
-`RiftexMethodNotAllowedError` additionally sets `Allow: <comma-joined methods>`.
+`IngeniumMethodNotAllowedError` additionally sets `Allow: <comma-joined methods>`.
 
 ## Customizing with `app.onError`
 
 ```ts
 app.onError((err, ctx) => {
-  if (err instanceof RiftexValidationError) {
+  if (err instanceof IngeniumValidationError) {
     return ctx.json({ error: err.message, fields: err.fields }, 422)
   }
-  if (err instanceof RiftexUnauthorizedError) {
+  if (err instanceof IngeniumUnauthorizedError) {
     return ctx.html('<h1>Login required</h1>', 401)
   }
-  if (err instanceof RiftexError) throw err   // delegate to default boundary
+  if (err instanceof IngeniumError) throw err   // delegate to default boundary
   ctx.json({ error: 'internal' }, 500)
 })
 ```

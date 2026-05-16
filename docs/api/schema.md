@@ -1,8 +1,8 @@
 # Standard Schema integration
 
-RiftExpress integrates with [Standard Schema v1](https://standardschema.dev) — a vendor-neutral protocol that any validation library can implement. When you pass a Standard Schema to `ctx.body.json(schema)`, the framework invokes its `validate` function, normalizes the issues into a flat `fields` map, and throws `RiftexValidationError` on failure.
+Ingenium integrates with [Standard Schema v1](https://standardschema.dev) — a vendor-neutral protocol that any validation library can implement. When you pass a Standard Schema to `ctx.body.json(schema)`, the framework invokes its `validate` function, normalizes the issues into a flat `fields` map, and throws `IngeniumValidationError` on failure.
 
-The types ship locally in [`packages/riftexpress/src/schema/standard.ts`](../../packages/riftexpress/src/schema/standard.ts) — RiftExpress does **not** depend on `@standard-schema/spec`, to keep the core dependency-free. The local types mirror the spec exactly.
+The types ship locally in [`packages/ingenium/src/schema/standard.ts`](../../packages/ingenium/src/schema/standard.ts) — Ingenium does **not** depend on `@standard-schema/spec`, to keep the core dependency-free. The local types mirror the spec exactly.
 
 ## Types
 
@@ -54,7 +54,7 @@ interface StandardPathSegment {
 }
 ```
 
-Each issue has a human-readable `message` and an optional structured `path`. Segments may be bare keys (`'email'`, `0`) or wrapped objects (`{ key: 'email' }`) — RiftExpress handles both.
+Each issue has a human-readable `message` and an optional structured `path`. Segments may be bare keys (`'email'`, `0`) or wrapped objects (`{ key: 'email' }`) — Ingenium handles both.
 
 ### `isStandardSchema(x)` — type guard
 
@@ -76,7 +76,7 @@ Standard Schema takes precedence even when a schema also exposes `safeParse` or 
 
 ## Path → field mapping
 
-Each issue's `path` is dot-joined into a flat key on the `RiftexValidationError.fields` map:
+Each issue's `path` is dot-joined into a flat key on the `IngeniumValidationError.fields` map:
 
 | `path` | Resulting field |
 |---|---|
@@ -107,4 +107,4 @@ const C = { parse(x: unknown) { if (typeof x !== 'object') throw new Error('nope
 app.post('/plain',   async (ctx) => ctx.body.json(C))
 ```
 
-All three throw `RiftexValidationError` on failure; the default error boundary serializes it as `{ error: 'Validation Failed', code: 'VALIDATION_FAILED', fields: { ... } }` with status 422.
+All three throw `IngeniumValidationError` on failure; the default error boundary serializes it as `{ error: 'Validation Failed', code: 'VALIDATION_FAILED', fields: { ... } }` with status 422.
