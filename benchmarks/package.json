@@ -1,0 +1,31 @@
+{
+  "name": "ingenium-benchmarks",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Local regression benchmarks for Ingenium vs Express/Fastify/Hono. NOT publishable performance claims.",
+  "scripts": {
+    "bench:hello": "tsx scenarios/hello.ts",
+    "bench:body": "tsx scenarios/body-json.ts",
+    "bench:middleware": "tsx scenarios/middleware-stack.ts",
+    "bench:errors": "tsx scenarios/error-path.ts",
+    "bench:all": "npm run bench:hello && npm run bench:body && npm run bench:middleware && npm run bench:errors",
+    "bench:v2": "tsx scenarios/v2/run-all.ts",
+    "bench:hello-v2": "tsx scenarios/v2/hello.ts",
+    "bench:body-v2": "tsx scenarios/v2/body.ts",
+    "bench:middleware-v2": "tsx scenarios/v2/middleware.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "autocannon": "^7.15.0",
+    "express": "^4.21.0",
+    "fastify": "^5.0.0",
+    "hono": "^4.6.0",
+    "ingenium": "*",
+    "tinybench": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "tsx": "^4.19.0"
+  }
+}

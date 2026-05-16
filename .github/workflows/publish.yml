@@ -1,0 +1,43 @@
+name: publish (alpha/beta)
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: which workspace to publish (ingenium, ingenium-compat, ingenium-bun, ingenium-cli)
+        required: true
+        default: ingenium
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - name: install
+        run: npm ci
+      - name: typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: test
+        run: npx vitest run --reporter=basic
+      - name: gate — alpha/beta only
+        run: |
+          PKG="${{ github.event.inputs.package }}"
+          VERSION=$(node -p "require('./packages/${PKG}/package.json').version")
+          if ! echo "$VERSION" | grep -Eq '\-(alpha|beta)(\.[0-9]+)?$'; then
+            echo "::error::Version ${VERSION} is not -alpha/-beta. Production publishes must use a different workflow (TODO: release-prod.yml)."
+            exit 1
+          fi
+      - name: publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PKG="${{ github.event.inputs.package }}"
+          npm publish --workspace "packages/${PKG}" --access public --tag alpha

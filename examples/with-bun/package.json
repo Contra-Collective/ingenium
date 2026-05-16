@@ -1,0 +1,18 @@
+{
+  "name": "ingenium-example-bun",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Ingenium server running on Bun.serve() via the BunAdapter transport.",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "dependencies": {
+    "ingenium": "*",
+    "ingenium-bun": "*"
+  }
+}

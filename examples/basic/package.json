@@ -1,0 +1,22 @@
+{
+  "name": "ingenium-example-basic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hello-world Ingenium server demonstrating core API surface.",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "ingenium": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "@types/node": "^22.5.0",
+    "typescript": "^5.6.0"
+  }
+}

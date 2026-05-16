@@ -1,0 +1,51 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 06:00 UTC
+    - cron: "0 6 * * *"
+
+# TODO: add a Bun bench job once a Bun-native v2 harness exists.
+# The current v2 harness in benchmarks/scenarios/v2 spawns Node child processes,
+# so running it under Bun would not exercise the Bun runtime end-to-end.
+
+jobs:
+  bench:
+    name: Run v2 benchmarks (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install benchmark dependencies
+        working-directory: benchmarks
+        run: npm install
+
+      - name: Run v2 scenarios
+        working-directory: benchmarks
+        run: |
+          {
+            echo "=== hello ==="
+            npx tsx scenarios/v2/hello.ts
+            echo "=== body ==="
+            npx tsx scenarios/v2/body.ts
+            echo "=== middleware ==="
+            npx tsx scenarios/v2/middleware.ts
+          } | tee bench-output.txt
+
+      - name: Upload bench output
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-output
+          path: benchmarks/bench-output.txt
+          if-no-files-found: error

@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "ingenium": ["./packages/ingenium/src/index.ts"],
+      "ingenium/*": ["./packages/ingenium/src/*"],
+      "ingenium-compat": ["./packages/ingenium-compat/src/index.ts"],
+      "ingenium-bun": ["./packages/ingenium-bun/src/index.ts"],
+      "ingenium-cli": ["./packages/ingenium-cli/src/cli.ts"],
+      "ingenium-redis": ["./packages/ingenium-redis/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/ingenium/src/**/*",
+    "packages/ingenium/test/**/*",
+    "packages/ingenium-compat/src/**/*",
+    "packages/ingenium-compat/test/**/*",
+    "packages/ingenium-bun/src/**/*",
+    "packages/ingenium-bun/test/**/*",
+    "packages/ingenium-cli/src/**/*",
+    "packages/ingenium-cli/test/**/*",
+    "packages/ingenium-redis/src/**/*",
+    "packages/ingenium-redis/test/**/*"
+  ]
+}
