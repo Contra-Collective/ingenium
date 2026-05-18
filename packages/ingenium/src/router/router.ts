@@ -102,6 +102,27 @@ export class Router {
   }
 
   /**
+   * Chainable per-path registration. Returns a builder that holds the path
+   * and lets you stack verbs on it without retyping:
+   *
+   * @example
+   *   router
+   *     .route('/users/:id')
+   *     .get((ctx) => loadUser(ctx.params.id))
+   *     .put(requireAdmin, (ctx) => updateUser(ctx))
+   *     .delete(requireAdmin, (ctx) => deleteUser(ctx))
+   *
+   * Pure registration sugar — every call delegates to `router.method(...)`,
+   * so all features (inline middleware, declarative options, typed params
+   * via `ExtractParams<P>`) work identically.
+   */
+  route<P extends string>(path: P): RouteBuilder<P> {
+    return new RouteBuilder<P>((method, args) =>
+      (this.method as (m: HttpMethod, p: string, ...a: unknown[]) => unknown)(method, path, ...args),
+    )
+  }
+
+  /**
    * Internal — register a route under any HTTP method. Accepts the variadic
    * `(...inlineMiddleware, handler)` tail; the LAST positional arg is always
    * the handler.
@@ -134,6 +155,56 @@ export class Router {
     }
     if (inline.length > 0) entry.inlineMiddleware = inline
     this.journal.push(entry)
+    return this
+  }
+}
+
+/**
+ * Per-path chainable builder returned by `app.route(path)` and
+ * `router.route(path)`. Holds the path and an "emit" callback that registers
+ * a route on the underlying host (an `IngeniumApp` or a `Router`); the
+ * builder itself is just sugar — no per-request cost, no separate dispatch
+ * path. The host's verb method does all the validation, dirty-bit flipping,
+ * and journal writes.
+ *
+ * The generic `P` flows `ExtractParams<P>` into every handler signature so
+ * `app.route('/users/:id').get(ctx => ctx.params.id)` narrows `ctx.params`
+ * exactly like the bare verb form does.
+ */
+export class RouteBuilder<P extends string> {
+  constructor(private readonly emit: (method: HttpMethod, args: unknown[]) => void) {}
+
+  get(handler: IngeniumHandler<ExtractParams<P>>): this
+  get(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  get(...args: unknown[]): this { this.emit('GET', args); return this }
+
+  post(handler: IngeniumHandler<ExtractParams<P>>): this
+  post(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  post(...args: unknown[]): this { this.emit('POST', args); return this }
+
+  put(handler: IngeniumHandler<ExtractParams<P>>): this
+  put(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  put(...args: unknown[]): this { this.emit('PUT', args); return this }
+
+  patch(handler: IngeniumHandler<ExtractParams<P>>): this
+  patch(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  patch(...args: unknown[]): this { this.emit('PATCH', args); return this }
+
+  delete(handler: IngeniumHandler<ExtractParams<P>>): this
+  delete(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  delete(...args: unknown[]): this { this.emit('DELETE', args); return this }
+
+  head(handler: IngeniumHandler<ExtractParams<P>>): this
+  head(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  head(...args: unknown[]): this { this.emit('HEAD', args); return this }
+
+  options(handler: IngeniumHandler<ExtractParams<P>>): this
+  options(...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  options(...args: unknown[]): this { this.emit('OPTIONS', args); return this }
+
+  /** Register the same handler for all common HTTP methods (GET, POST, PUT, PATCH, DELETE). */
+  all(handler: IngeniumHandler<ExtractParams<P>>): this {
+    for (const m of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const) this.emit(m, [handler])
     return this
   }
 }

@@ -19,7 +19,7 @@ import type {
   IngeniumPlugin,
   PluginTarget,
 } from './plugin/types.ts'
-import { Router, flattenRouter } from './router/router.ts'
+import { RouteBuilder, Router, flattenRouter } from './router/router.ts'
 import { ScopedApp } from './app/scope.ts'
 import { registerAfter, registerBefore } from './sinatra/filters.ts'
 import { EMPTY_PARAMS, RouterTrie, type MatchMiss } from './router/trie.ts'
@@ -27,6 +27,8 @@ import type { HttpMethod } from './router/types.ts'
 import { NodeAdapter } from './transport/node.ts'
 import type { ListeningServer, Transport } from './transport/types.ts'
 import { descriptorKey, type RouteDescriptor } from './openapi/describe.ts'
+import { isStandardSchema } from './schema/standard.ts'
+import type { RequestBody, Response, Schema } from './openapi/types.ts'
 import { QueueRegistry } from './jobs/registry.ts'
 import type { JobHandle, QueueOptions, QueueWorker } from './jobs/types.ts'
 import { CronRegistry } from './cron/registry.ts'
@@ -86,6 +88,22 @@ export interface IngeniumAppOptions {
    * `10_000`ms — matches `gracefulShutdown`'s default `gracefulTimeoutMs`.
    */
   queueDrainTimeoutMs?: number
+
+  /**
+   * Secret(s) used to HMAC-sign cookies written via
+   * `ctx.cookies.set(name, value, { signed: true })`.
+   *
+   * Accepts a single string or an array — the FIRST entry signs new cookies,
+   * ALL entries verify reads (so rotating a secret is: prepend the new key,
+   * keep the old key, deploy; remove the old key on the next deploy once all
+   * outstanding signed cookies have expired).
+   *
+   * If omitted, calling `ctx.cookies.set(..., { signed: true })` or
+   * `ctx.cookies.get(..., { signed: true })` throws
+   * `IngeniumError(500, 'COOKIE_SECRET_MISSING')`. The unsigned cookie API
+   * still works without any secrets configured.
+   */
+  cookieSecrets?: string | string[]
 }
 
 /** Default transport-layer body ceiling — see {@link IngeniumAppOptions.maxRequestBytes}. */
@@ -102,6 +120,34 @@ export type IngeniumErrorHandler = (err: unknown, ctx: IngeniumContext) => unkno
  * middleware is prepended to the route's chain.
  */
 export type RouteOptions = Record<string, unknown>
+
+/**
+ * Well-known route-options keys handled natively by the framework. Mixed with
+ * user-defined declarator keys in the same options object — the framework
+ * peels off the well-known ones at REGISTRATION time, hands them straight to
+ * `app.describe(method, path, ...)`, and forwards everything else to
+ * `translateRouteOptions()` for declarator resolution. Built-in keys never
+ * trigger the "unknown declarator" error because they're removed from the
+ * forwarded options before declarator lookup runs.
+ *
+ * Inline schema values for `response` / `requestBody` accept ONLY raw OpenAPI
+ * Schema objects today. Passing a Standard Schema or Zod validator throws at
+ * registration time — converting validators to JSON Schema is the OpenAPI
+ * generator's job and isn't wired through this seam yet. Use
+ * `app.describe(method, path, ...)` with a precomputed schema if you need
+ * that today.
+ */
+const BUILTIN_ROUTE_OPTION_KEYS: ReadonlySet<string> = new Set([
+  'response',
+  'requestBody',
+  'tags',
+  'summary',
+  'description',
+  'parameters',
+  'deprecated',
+  'operationId',
+  'security',
+])
 
 /**
  * Variadic arg shape accepted by `app.get/post/...` and `app.method(...)` after
@@ -150,6 +196,15 @@ export class IngeniumApp implements PluginTarget {
   private readonly _crons: CronRegistry = new CronRegistry()
   /** @internal Default queue-drain timeout used when the listener closes. */
   private readonly _queueDrainTimeoutMs: number
+  /**
+   * @internal Frozen list of cookie-signing secrets, normalized from the
+   * scalar/array input. Empty array when not configured. Stamped onto each
+   * dispatched context only when non-empty (per-request field write avoided
+   * for the common case of "no cookie secrets configured").
+   */
+  private readonly _cookieSecrets: readonly string[]
+  /** @internal Whether `cookieSecrets` was configured — caches the truthy check. */
+  private readonly _hasCookieSecrets: boolean
 
   /**
    * @internal Per-request dispatch booleans, recomputed at every `compose()`.
@@ -177,6 +232,18 @@ export class IngeniumApp implements PluginTarget {
     this._requestTimeoutMs = options.requestTimeoutMs
     this._maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
     this._queueDrainTimeoutMs = options.queueDrainTimeoutMs ?? 10_000
+    // Normalize scalar/array secret input into a frozen list. Frozen because
+    // the array reference is shared across every request — accidental mutation
+    // anywhere would silently change the verify set for the whole app.
+    const rawSecrets = options.cookieSecrets
+    this._cookieSecrets = Object.freeze(
+      rawSecrets === undefined
+        ? []
+        : Array.isArray(rawSecrets)
+          ? rawSecrets.slice()
+          : [rawSecrets],
+    )
+    this._hasCookieSecrets = this._cookieSecrets.length > 0
     // These two are stable for the lifetime of the app.
     this._hasTimeout = options.requestTimeoutMs !== undefined
     this._hasTrustProxy = (options.trustProxy ?? false) !== false
@@ -434,6 +501,27 @@ export class IngeniumApp implements PluginTarget {
   }
 
   /**
+   * Chainable per-path registration. Returns a `RouteBuilder` that stacks
+   * verb registrations on the same path without retyping it:
+   *
+   * @example
+   *   app
+   *     .route('/users/:id')
+   *     .get((ctx) => loadUser(ctx.params.id))
+   *     .put(requireAdmin, (ctx) => updateUser(ctx))
+   *     .delete(requireAdmin, (ctx) => deleteUser(ctx))
+   *
+   * Pure registration sugar — every call delegates to `app.method(...)`, so
+   * declarative options, inline middleware, and typed params via
+   * `ExtractParams<P>` work exactly as they do on the bare verb form.
+   */
+  route<P extends string>(path: P): RouteBuilder<P> {
+    return new RouteBuilder<P>((method, args) =>
+      (this.method as (m: HttpMethod, p: string, ...a: VerbArgs) => this)(method, path, ...(args as VerbArgs)),
+    )
+  }
+
+  /**
    * Register a route under any HTTP method. Accepts the variadic shape with
    * an optional declarative-options object as the first arg (after `path`).
    */
@@ -454,7 +542,33 @@ export class IngeniumApp implements PluginTarget {
     let translatedHead: IngeniumMiddleware[] = []
     let tail: unknown[] = args
     if (isPlainOptionsObject(args[0])) {
-      translatedHead = this.translateRouteOptions(method, path, args[0] as RouteOptions)
+      const opts = args[0] as RouteOptions
+      // Peel off well-known OpenAPI keys → describe() at registration time.
+      // Forward everything else through the declarator pipeline. Splitting
+      // the bag in two means a single options object can legally mix
+      // built-in keys (`tags`, `summary`, ...) with user declarator keys
+      // (`auth`, `rateLimit`, ...) without the latter tripping over the
+      // former or vice versa.
+      const builtins: Record<string, unknown> = {}
+      const userOpts: RouteOptions = {}
+      let hasBuiltins = false
+      let hasUser = false
+      for (const key of Object.keys(opts)) {
+        if (BUILTIN_ROUTE_OPTION_KEYS.has(key)) {
+          builtins[key] = opts[key]
+          hasBuiltins = true
+        } else {
+          userOpts[key] = opts[key]
+          hasUser = true
+        }
+      }
+      if (hasBuiltins) {
+        const descriptor = buildDescriptorFromBuiltins(method, path, builtins)
+        this.describe(method, path, descriptor)
+      }
+      if (hasUser) {
+        translatedHead = this.translateRouteOptions(method, path, userOpts)
+      }
       tail = args.slice(1)
     }
     if (tail.length === 0) {
@@ -575,11 +689,18 @@ export class IngeniumApp implements PluginTarget {
 
   /**
    * Attach OpenAPI metadata to a route. The route must be registered separately
-   * via `app.get/post/...`. Multiple calls overwrite the previous descriptor
-   * for the same `(method, path)` pair. Reads via `generateOpenApi(app)`.
+   * via `app.get/post/...`. Multiple calls MERGE shallowly onto the existing
+   * descriptor for the same `(method, path)` pair — later keys overwrite
+   * earlier ones, but keys absent from `meta` are preserved. This is what lets
+   * the inline-options form (`app.get(p, { tags: [...] }, h)`) coexist with a
+   * later explicit `app.describe(method, p, { summary })` without one wiping
+   * the other. Reads via `generateOpenApi(app)`.
    */
   describe(method: HttpMethod, path: string, meta: RouteDescriptor): this {
-    this._routeDescriptors.set(descriptorKey(method, path), meta)
+    const key = descriptorKey(method, path)
+    const existing = this._routeDescriptors.get(key)
+    const merged: RouteDescriptor = existing ? { ...existing, ...meta } : meta
+    this._routeDescriptors.set(key, merged)
     this._routeDescriptorVersion++
     return this
   }
@@ -755,6 +876,13 @@ export class IngeniumApp implements PluginTarget {
     // the app from inside a route handler. ctx.state is reset per request
     // by the pool, so this doesn't leak between requests.
     ctx.state._ingeniumApp = this
+
+    // Stamp cookie secrets ONLY when configured. Same pattern as `_trustProxy`:
+    // apps that don't use signed cookies pay zero (the field load on the ctx
+    // returns the default empty-array initialised at class-field stamp time).
+    // We don't reset this between requests because it's app-wide config — the
+    // reassignment is idempotent against the same frozen array reference.
+    if (this._hasCookieSecrets) ctx._cookieSecrets = this._cookieSecrets
 
     // ───── Fast path ─────────────────────────────────────────────────────
     // Apps with no plugins, no decorators, no timeout, and no trust-proxy
@@ -974,6 +1102,209 @@ function isPlainOptionsObject(v: unknown): v is RouteOptions {
   if (Array.isArray(v)) return false
   const proto = Object.getPrototypeOf(v) as object | null
   return proto === null || proto === Object.prototype
+}
+
+/**
+ * Translate the peeled-off built-in slice of a route-options object into the
+ * shape `app.describe()` expects. Pass-through for plain OpenAPI keys
+ * (`summary`, `description`, `operationId`, `tags`, `deprecated`, `security`,
+ * `parameters`); normalization for `response` / `requestBody` which the user
+ * may write in compact form (a bare Schema). See `normalizeResponse` /
+ * `normalizeRequestBody` for the rules. Throws at REGISTRATION time on any
+ * inline value that looks like a live validator (Standard Schema or Zod-style
+ * `safeParse`) — we don't try to convert validators to JSON Schema from this
+ * code path; callers can precompute and use `app.describe()` directly.
+ */
+function buildDescriptorFromBuiltins(
+  method: HttpMethod,
+  path: string,
+  builtins: Record<string, unknown>,
+): RouteDescriptor {
+  const desc: RouteDescriptor = {}
+  if ('summary' in builtins) desc.summary = builtins.summary as string
+  if ('description' in builtins) desc.description = builtins.description as string
+  if ('operationId' in builtins) desc.operationId = builtins.operationId as string
+  if ('tags' in builtins) desc.tags = builtins.tags as string[]
+  if ('deprecated' in builtins) desc.deprecated = builtins.deprecated as boolean
+  if ('security' in builtins) desc.security = builtins.security as RouteDescriptor['security']
+  if ('parameters' in builtins) desc.parameters = builtins.parameters as RouteDescriptor['parameters']
+  if ('response' in builtins) {
+    desc.responses = normalizeResponse(method, path, builtins.response)
+  }
+  if ('requestBody' in builtins) {
+    desc.requestBody = normalizeRequestBody(method, path, builtins.requestBody)
+  }
+  return desc
+}
+
+/**
+ * Reject inline schema values that need conversion we don't perform at this
+ * seam. We accept ONLY raw OpenAPI Schema objects (plain JSON Schema literals,
+ * including the wrappers Zod 3.24+/ArkType/Effect emit when the caller has
+ * already called `.toJsonSchema()`). Anything that still carries a live
+ * `~standard` or `safeParse` is a precondition violation: it's the caller's
+ * job to convert. The OpenAPI generator's runtime conversion path handles
+ * validators passed through the long-form `app.describe()` API; this inline
+ * convenience form intentionally stays conversion-free so the failure mode
+ * is at registration, not at spec-generation time inside a healthcheck.
+ */
+function validateInlineSchema(
+  method: HttpMethod,
+  path: string,
+  location: 'response' | 'requestBody',
+  value: unknown,
+): void {
+  if (value === null || typeof value !== 'object') return
+  if (isStandardSchema(value)) {
+    throw new TypeError(
+      `app.${method.toLowerCase()}('${path}', { ${location}: ... }, handler): inline schema conversion isn't supported yet. ` +
+        `Pass a plain OpenAPI Schema object, or use app.describe() with a precomputed schema.`,
+    )
+  }
+  const maybeZod = value as { safeParse?: unknown }
+  if (typeof maybeZod.safeParse === 'function') {
+    throw new TypeError(
+      `app.${method.toLowerCase()}('${path}', { ${location}: ... }, handler): inline schema conversion isn't supported yet. ` +
+        `Pass a plain OpenAPI Schema object, or use app.describe() with a precomputed schema.`,
+    )
+  }
+}
+
+/**
+ * Three-digit status-code key heuristic — `200`, `404`, `4XX` are all
+ * accepted. Used to distinguish "status-keyed response map" from "bare
+ * schema with `200`-shaped property names." Keys longer than 3 chars, with
+ * non-digit/non-X content, or starting with `0` are NOT status codes.
+ */
+function isStatusKey(k: string): boolean {
+  if (k.length !== 3) return false
+  if (k[0] === '0') return false
+  for (let i = 0; i < 3; i++) {
+    const c = k.charCodeAt(i)
+    // 0-9 or X / x
+    if (!((c >= 48 && c <= 57) || c === 88 || c === 120)) return false
+  }
+  return true
+}
+
+/**
+ * Heuristic: does this look like a JSON Schema literal? Detects the common
+ * top-level keywords. Used to choose between `{ response: SchemaLiteral }`
+ * (wrap as 200) and `{ response: { '200': {...}, '404': {...} } }`
+ * (status-keyed map). The two shapes are unambiguous in practice because a
+ * status-keyed map's keys are all 3-char digits and JSON Schema keywords
+ * never are.
+ */
+function looksLikeSchemaLiteral(v: object): boolean {
+  const obj = v as Record<string, unknown>
+  return (
+    'type' in obj ||
+    'properties' in obj ||
+    '$ref' in obj ||
+    'oneOf' in obj ||
+    'anyOf' in obj ||
+    'allOf' in obj ||
+    'enum' in obj ||
+    'const' in obj ||
+    'items' in obj
+  )
+}
+
+/**
+ * Normalize the inline `response` option into the descriptor's `responses`
+ * map. Three accepted shapes:
+ *   1. A bare OpenAPI Schema → wrapped as `200 application/json` content.
+ *   2. A status-keyed map (`{ '200': {...}, '404': {...} }`) where each entry
+ *      is either a full `Response` object or a bare Schema.
+ *   3. An already-shaped `Response` (has `description` and/or `content`) for
+ *      the 200 slot.
+ *
+ * Picks (1) vs (2) by inspecting the object's keys: if any key is a 3-digit
+ * status code (`200`, `4XX`), it's (2); if the object looks like a JSON
+ * Schema literal (`type`/`properties`/`$ref`/...), it's (1); otherwise we
+ * fall back to (3) — wrap the value as the 200 Response.
+ */
+function normalizeResponse(
+  method: HttpMethod,
+  path: string,
+  value: unknown,
+): Record<string, Response> {
+  validateInlineSchema(method, path, 'response', value)
+  if (value === null || typeof value !== 'object') {
+    // A non-object is not a meaningful response shape. Wrap as an opaque
+    // 200 schema so the caller at least sees something in the spec.
+    return {
+      '200': {
+        description: 'OK',
+        content: { 'application/json': { schema: value as Schema } },
+      },
+    }
+  }
+  const obj = value as Record<string, unknown>
+  const keys = Object.keys(obj)
+  const allStatus = keys.length > 0 && keys.every(isStatusKey)
+
+  if (allStatus) {
+    const out: Record<string, Response> = {}
+    for (const k of keys) {
+      out[k] = coerceResponseEntry(method, path, obj[k])
+    }
+    return out
+  }
+
+  // Single 200 entry. If it already looks like a Response (has description
+  // and/or content), pass it through; otherwise wrap as JSON content.
+  if ('content' in obj || ('description' in obj && !looksLikeSchemaLiteral(obj))) {
+    return { '200': obj as Response }
+  }
+  return {
+    '200': {
+      description: 'OK',
+      content: { 'application/json': { schema: obj as Schema } },
+    },
+  }
+}
+
+/**
+ * Coerce a single value from a status-keyed `response` map into a `Response`.
+ * Accepts either a full `Response` (passed through) or a bare schema (wrapped
+ * as `application/json` content with a default description).
+ */
+function coerceResponseEntry(method: HttpMethod, path: string, value: unknown): Response {
+  validateInlineSchema(method, path, 'response', value)
+  if (value === null || typeof value !== 'object') {
+    return {
+      description: 'Response',
+      content: { 'application/json': { schema: value as Schema } },
+    }
+  }
+  const obj = value as Record<string, unknown>
+  if ('content' in obj || ('description' in obj && !looksLikeSchemaLiteral(obj))) {
+    return obj as Response
+  }
+  return {
+    description: 'Response',
+    content: { 'application/json': { schema: obj as Schema } },
+  }
+}
+
+/**
+ * Normalize the inline `requestBody` option into a full `RequestBody` shape.
+ * If the value already has a `content` field (an OpenAPI RequestBody),
+ * pass it through; otherwise wrap as `application/json` content.
+ */
+function normalizeRequestBody(
+  method: HttpMethod,
+  path: string,
+  value: unknown,
+): RequestBody {
+  validateInlineSchema(method, path, 'requestBody', value)
+  if (value === null || typeof value !== 'object') {
+    return { content: { 'application/json': { schema: value as Schema } } }
+  }
+  const obj = value as Record<string, unknown>
+  if ('content' in obj) return obj as RequestBody
+  return { content: { 'application/json': { schema: obj as Schema } } }
 }
 
 /**

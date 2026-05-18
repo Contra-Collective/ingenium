@@ -140,6 +140,9 @@ function readExpectedToken(ctx: IngeniumContext, opts: ResolvedOptions): string 
   return typeof token === 'string' && token.length > 0 ? token : null
 }
 
+// TODO: migrate to ctx.cookies — kept inline because csrf uses the
+// double-submit pattern with a non-HttpOnly cookie + HMAC value, which the
+// generic cookie API doesn't model directly.
 function writeCookie(ctx: IngeniumContext, token: string, cookie: Required<CsrfCookieOptions>): void {
   const parts: string[] = [`${cookie.name}=${encodeURIComponent(token)}`]
   parts.push(`Path=${cookie.path}`)

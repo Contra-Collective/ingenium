@@ -43,6 +43,13 @@ app.patch(path, handler)
 app.delete(path, handler)
 app.head(path, handler)
 app.options(path, handler)
+app.route(path)            // chainable: .get(h).put(h).delete(h).all(h)
+
+// Inline OpenAPI options (peeled to describe() at registration):
+//   response, requestBody, tags, summary, description,
+//   parameters, deprecated, operationId, security
+// app.get('/users/:id', { tags: ['users'], summary: '...', response: UserSchema }, handler)
+app.route(path)            // chainable: .get(h).put(h).delete(h).all(h)
 
 app.onError((err: unknown, ctx: IngeniumContext) => unknown | Promise<unknown>): this
 app.compose(): void                       // explicit pre-warm; auto-runs lazily on first request

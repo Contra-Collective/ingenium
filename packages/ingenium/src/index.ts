@@ -19,10 +19,15 @@ import { openapiHandler } from './openapi/handler.ts'
 
 // ───── App + Router ────────────────────────────────────────────────────────
 export { IngeniumApp, type IngeniumAppOptions, type IngeniumErrorHandler, type RouteOptions } from './app.ts'
-export { Router } from './router/router.ts'
+export { Router, RouteBuilder } from './router/router.ts'
 
 // ───── Context + Body ──────────────────────────────────────────────────────
 export { IngeniumContext, type ResponseBody, type IngeniumQuery } from './context/context.ts'
+export type {
+  IngeniumCookies,
+  CookieSetOptions,
+  CookieGetOptions,
+} from './context/cookies.ts'
 export { IngeniumBody, type ParseSchema, type SafeParseSchema } from './context/body.ts'
 export { IngeniumContextPool } from './context/pool.ts'
 export type {

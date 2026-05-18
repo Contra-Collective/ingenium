@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from 'node:http'
 import type { Readable } from 'node:stream'
 import { Buffer } from 'node:buffer'
 import { IngeniumBody, type ParseSchema, type SafeParseSchema } from './body.ts'
+import { makeIngeniumCookies, type IngeniumCookies } from './cookies.ts'
 import { isStandardSchema, type StandardIssue, type StandardSchemaV1 } from '../schema/standard.ts'
 import type { HttpMethod } from '../router/types.ts'
 import { resolveForwarded, type ForwardedInfo, type TrustProxy } from '../proxy/trust.ts'
@@ -288,6 +289,41 @@ export class IngeniumContext<Params = Record<string, string>> {
     if (!this._query) this._query = makeIngeniumQuery(this.rawQuery)
     return this._query
   }
+
+  /**
+   * @internal Lazy cookie holder. `null` until first read of `ctx.cookies`.
+   * Reset to `null` in `reset()` so a context returned to the pool drops the
+   * parsed-cookie cache (and any closed-over write state — though writes go
+   * straight to `_headers`, which is itself reset by reassignment).
+   */
+  _cookies: IngeniumCookies | null = null
+  /**
+   * First-class cookie API. Lazy: the holder is allocated on first access so
+   * apps that never touch cookies pay zero per-request overhead. See
+   * `cookies.ts` for the read/write contract and signing rules.
+   *
+   * @example
+   *   const sid = ctx.cookies.get('sid', { signed: true })
+   *   ctx.cookies.set('theme', 'dark', { httpOnly: true, sameSite: 'lax' })
+   *   ctx.cookies.clear('legacy')
+   */
+  get cookies(): IngeniumCookies {
+    if (!this._cookies) this._cookies = makeIngeniumCookies(this)
+    return this._cookies
+  }
+
+  /**
+   * @internal App-wide cookie-signing secrets. Stamped by `IngeniumApp.handle`
+   * on dispatch entry when configured (mirrors `_trustProxy`). First secret
+   * signs new cookies; all entries verify reads (supports rotation). Empty
+   * means signed cookies will throw `IngeniumError(500, 'COOKIE_SECRET_MISSING')`.
+   *
+   * NOT cleared in `reset()` — this is app-wide config, not per-request state,
+   * and the cost of re-stamping every request is wasteful when the value is
+   * stable across the app's lifetime. The first call to `handle()` after a
+   * compose sets it; subsequent requests reuse the same array reference.
+   */
+  _cookieSecrets: readonly string[] = []
 
   // ───── Network info (trust-proxy aware) ────────────────────────────────
   /** Immediate socket peer address — populated by the adapter. */
@@ -597,6 +633,7 @@ export class IngeniumContext<Params = Record<string, string>> {
     this.params = EMPTY_PARAMS as unknown as Params
     this.headers = {}
     this._query = null
+    this._cookies = null
     this.state = Object.create(null) as Record<string, unknown>
     this.remoteAddress = '127.0.0.1'
     this.baseProtocol = 'http'

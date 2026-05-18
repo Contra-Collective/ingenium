@@ -13,6 +13,9 @@ const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 7 // 7 days
 const ID_BYTES = 18
 
 // ───── Cookie helpers ───────────────────────────────────────────────────────
+// TODO: migrate to ctx.cookies — kept inline for now because session has
+// specific behaviours (rolling, secret-rotation re-signing, destroy-on-commit)
+// that don't map 1:1 onto the generic cookie API.
 
 /**
  * Parse a `Cookie` request header into a name→value map. Handles:

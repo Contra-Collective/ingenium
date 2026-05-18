@@ -76,6 +76,99 @@ app.method(method: HttpMethod, path: string, handler: IngeniumHandler): this
 
 `app.method(...)` is the underlying primitive — the named helpers all delegate to it. Useful for registering routes whose method is determined at runtime.
 
+#### `app.route(path)` — chainable per-path builder
+
+```ts
+app.route<P extends string>(path: P): RouteBuilder<P>
+```
+
+Returns a builder bound to `path` so multiple verbs can be registered without retyping it:
+
+```ts
+app
+  .route('/users/:id')
+  .get((ctx) => loadUser(ctx.params.id))
+  .put(requireAdmin, (ctx) => updateUser(ctx))
+  .delete(requireAdmin, (ctx) => deleteUser(ctx))
+```
+
+Pure registration sugar — every call delegates to `app.method(...)`. Inline middleware, declarative options, and typed params via `ExtractParams<P>` all work as on the bare verbs. The builder also exposes `.all(handler)` which registers GET, POST, PUT, PATCH, and DELETE with the same handler in one call.
+
+`Router` exposes the same `route(path)` method.
+
+#### Inline route options for OpenAPI metadata
+
+The declarative options object accepts well-known keys handled natively by the framework — they don't need to be registered via `app.declare(...)`:
+
+```ts
+app.get('/users/:id', {
+  tags: ['users'],
+  summary: 'Get a user by ID',
+  description: 'Returns the user record or 404.',
+  response: UserSchema,                          // raw OpenAPI Schema; wraps as 200 application/json
+  // or status-keyed: response: { '200': { ... }, '404': { description: 'Not found' } },
+  deprecated: false,
+  operationId: 'getUser',
+  parameters: [{ name: 'expand', in: 'query', schema: { type: 'string' } }],
+  security: [{ bearerAuth: [] }],
+}, handler)
+
+app.post('/users', {
+  tags: ['users'],
+  requestBody: NewUserSchema,                    // wraps as application/json request body
+  response: { '201': { description: 'Created', content: { 'application/json': { schema: UserSchema } } } },
+}, handler)
+```
+
+These keys are peeled off at registration time and routed to `app.describe(method, path, ...)` (with shallow-merge semantics so later `describe()` calls compose with inline metadata). Anything not in the built-in set goes through `translateRouteOptions()` for declarator lookup, so user declarators (`auth`, `rateLimit`, etc.) coexist freely:
+
+```ts
+app.declare('auth', (roles: string[]) => requireRoles(roles))
+
+app.get('/admin', {
+  auth: ['admin'],         // declarator → middleware
+  tags: ['admin'],         // built-in → describe()
+  summary: 'List admins',
+}, listAdmins)
+```
+
+**Schema-conversion caveat (v1).** Inline `response` and `requestBody` accept only raw OpenAPI Schema objects today. Passing a Standard Schema validator or a Zod schema throws `TypeError` at registration time:
+
+```ts
+// ❌ Throws — converting validators to JSON Schema isn't wired yet.
+app.post('/users', { requestBody: zodSchema }, handler)
+
+// ✅ Works.
+app.post('/users', {
+  requestBody: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+}, async (ctx) => {
+  const body = await ctx.body.json(zodSchema)    // validators still run at request time
+  return body
+})
+```
+
+Validators still run via `ctx.body.json(schema)` — the inline option is purely for OpenAPI spec output.
+
+#### `app.route(path)` — chainable per-path builder
+
+```ts
+app.route<P extends string>(path: P): RouteBuilder<P>
+```
+
+Returns a builder bound to `path` so multiple verbs can be registered without retyping it:
+
+```ts
+app
+  .route('/users/:id')
+  .get((ctx) => loadUser(ctx.params.id))
+  .put(requireAdmin, (ctx) => updateUser(ctx))
+  .delete(requireAdmin, (ctx) => deleteUser(ctx))
+```
+
+Pure registration sugar — every call delegates to `app.method(...)`. Inline middleware, declarative options, and typed params via `ExtractParams<P>` all work as on the bare verbs. The builder also exposes `.all(handler)` which registers GET, POST, PUT, PATCH, and DELETE with the same handler in one call.
+
+`Router` exposes the same `route(path)` method.
+
 ```ts
 app.get('/users/:id', (ctx) => loadUser(ctx.params.id))
 app.method('OPTIONS', '/anywhere', () => ({ ok: true }))

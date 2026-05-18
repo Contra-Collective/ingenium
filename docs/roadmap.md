@@ -21,6 +21,10 @@
 - `IngeniumContext` request/response surface (params, query, headers, `state`, status/header setters, terminal writers `json` / `text` / `html` / `send` / `redirect` / `stream`).
 - `IngeniumBody` lazy parsers: `json`, `text`, `urlencoded`, `buffer`, `stream`, `multipart`. **Buffer-level parse cache** — multiple consumers can re-read the body without "already consumed" errors.
 - `app.inject({ method, url, headers, body })` — in-process test client returning `{ status, headers, body, json<T>() }`. No socket, no transport — same dispatch path as the wire.
+- `app.route(path).get(h).put(h).delete(h).all(h)` — chainable per-path builder. Pure registration sugar; same verb semantics, typed params via `ExtractParams<P>`.
+- `app.route(path).get(h).put(h).delete(h).all(h)` — chainable per-path builder. Pure registration sugar; same verb semantics, typed params via `ExtractParams<P>`.
+- `ctx.cookies` — first-class cookie API with signed-cookie support (`cookieSecrets` on app options, HMAC-SHA-256 with key rotation).
+- Inline OpenAPI route options — `app.get(path, { tags, summary, response, requestBody, deprecated, ... }, handler)` peels off well-known keys at registration and routes them through `describe()`.
 - `app.scope(prefix, register)` — plugin and middleware scoping onto a path subtree. Compose-time resolution; hot path unchanged. Plugins target `PluginTarget` (implemented by both `IngeniumApp` and `ScopedApp`).
 - Type-level `ExtractParams<Path>` narrowing on verb handlers — `app.get('/users/:id', ctx => ctx.params.id)` types as `string`.
 - `ctx.query.parse(schema)` symmetric with `ctx.body.json(schema)`. Shallow-array-aware coercion (repeated keys → `string[]`).
@@ -55,7 +59,6 @@ during development, not marketing material.
 
 ## Known issues — bugs
 
-- **Static middleware doesn't honor `If-Modified-Since`** — only `If-None-Match`.
 - **`ExtractParams` doesn't narrow constrained params** — `:id(\\d+)` strips the constraint and stays `string`. Unconstrained params (`:id`) now narrow correctly. The router doesn't yet honor inline constraints at runtime; types and runtime have to land together.
 
 ## Known issues — gaps
@@ -71,17 +74,13 @@ during development, not marketing material.
 
 The local `bench:v2` harness covers hello-world, JSON echo, and middleware-stack on Node — and includes Hono, Fastify, and Express side-by-side. What's still missing: pinned dependency versions, isolated CPU pinning, Bun runs in the same matrix, 1KB / 100KB payload scenarios, RSS tracking, and a CI runner that publishes the numbers per PR. Honest comparative numbers need that infra; spinning it up is its own session.
 
-### Per-route option object with response schema + OpenAPI hints inline
+### Inline OpenAPI schema conversion
 
-`app.get('/path', { response: ResponseSchema, tags: ['users'] }, handler)` so OpenAPI generation stops requiring a separate `describe(...)` call.
+Inline `{ response, requestBody }` accepts only raw OpenAPI Schema objects today. Standard Schema / Zod validators passed inline throw at registration. Lift the limitation by adapting validators → JSON Schema via vendor-specific helpers (TypeBox is JSON Schema natively; Zod has `zod-to-json-schema`).
 
-### `app.route('/users/:id').get(h).put(h)` chainable builder
+### Session / CSRF migration to `ctx.cookies`
 
-Pure registration-time sugar over the existing verbs; sets up cleanly for per-route metadata.
-
-### Typed `ctx.cookies` first-class API
-
-Today cookies live inside `sessionMiddleware` / `csrf`. A small `ctx.cookies.get(name)` / `ctx.cookies.set(name, value, opts)` with signed-cookie support pays for itself across CSRF, session, and any auth plugin.
+Both subsystems still hand-roll cookie writes — there's a `// TODO: migrate to ctx.cookies` marker on each. Migrating is largely mechanical but the existing tests need to still pass on the rolling-session edge cases.
 
 ### TypeBox-specific bridge
 
