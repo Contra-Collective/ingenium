@@ -1,5 +1,5 @@
 import type { IngeniumHandler, IngeniumMiddleware } from '../middleware/types.ts'
-import type { HttpMethod } from './types.ts'
+import type { ExtractParams, HttpMethod } from './types.ts'
 
 /** A journal entry — replayed against the trie when the app composes. */
 export type Registration =
@@ -65,40 +65,40 @@ export class Router {
   // variadic `(path, ...inlineMiddleware, handler)` shape Express uses. The
   // overloads keep TypeScript happy with the "handler is always last" rule.
 
-  get<P extends string>(path: P, handler: IngeniumHandler): this
-  get<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  get<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('GET', path, ...args)
+  get<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  get<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  get<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('GET', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  post<P extends string>(path: P, handler: IngeniumHandler): this
-  post<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  post<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('POST', path, ...args)
+  post<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  post<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  post<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('POST', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  put<P extends string>(path: P, handler: IngeniumHandler): this
-  put<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  put<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('PUT', path, ...args)
+  put<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  put<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  put<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('PUT', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  patch<P extends string>(path: P, handler: IngeniumHandler): this
-  patch<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  patch<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('PATCH', path, ...args)
+  patch<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  patch<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  patch<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('PATCH', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  delete<P extends string>(path: P, handler: IngeniumHandler): this
-  delete<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  delete<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('DELETE', path, ...args)
+  delete<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  delete<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  delete<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('DELETE', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  head<P extends string>(path: P, handler: IngeniumHandler): this
-  head<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  head<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('HEAD', path, ...args)
+  head<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  head<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  head<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('HEAD', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
-  options<P extends string>(path: P, handler: IngeniumHandler): this
-  options<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this
-  options<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler]): this {
-    return this.method('OPTIONS', path, ...args)
+  options<P extends string>(path: P, handler: IngeniumHandler<ExtractParams<P>>): this
+  options<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this
+  options<P extends string>(path: P, ...args: [...IngeniumMiddleware[], IngeniumHandler<ExtractParams<P>>]): this {
+    return this.method('OPTIONS', path, ...(args as [...IngeniumMiddleware[], IngeniumHandler]))
   }
 
   /**

@@ -18,7 +18,14 @@ import { apiKeyMiddleware } from './api-key/middleware.ts'
 import { openapiHandler } from './openapi/handler.ts'
 
 // ───── App + Router ────────────────────────────────────────────────────────
-export { IngeniumApp, type IngeniumAppOptions, type IngeniumErrorHandler, type RouteOptions } from './app.ts'
+export {
+  IngeniumApp,
+  type IngeniumAppOptions,
+  type IngeniumErrorHandler,
+  type RouteOptions,
+  type InjectRequest,
+  type InjectResponse,
+} from './app.ts'
 export { Router } from './router/router.ts'
 
 // ───── Context + Body ──────────────────────────────────────────────────────

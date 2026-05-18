@@ -61,6 +61,27 @@ export class IngeniumBody {
   /** @internal */ _consumed = false
   /** @internal */ _contentType: string | undefined = undefined
   /** @internal */ _contentLength: number | undefined = undefined
+  /**
+   * @internal
+   * Parse cache. Stores the raw body bytes after the first successful
+   * `buffer()` (or `text()` / `json()` / `urlencoded()`, which all go
+   * through `buffer()`). Subsequent buffer-producing consumers reuse
+   * these bytes instead of throwing "already consumed".
+   *
+   * Caches the RAW Buffer (not parsed objects) so different callers can
+   * apply different schemas / decoders against the same bytes — a
+   * common pattern when an audit middleware reads the body before the
+   * handler does. Re-parsing JSON from a cached buffer is cheap; mixing
+   * schemas against a cached parsed object would be incorrect.
+   *
+   * `stream()` opts out (it hands the caller ownership of the raw
+   * Readable) and `multipart()` opts out (its result is bespoke and
+   * re-parsing with different options would be ambiguous).
+   *
+   * Checked with `!== null` rather than truthiness so an empty body
+   * (`Buffer.alloc(0)`) still hits the cache on subsequent reads.
+   */
+  /** @internal */ _cached: Buffer | null = null
 
   /** @internal Adapter calls this on each request before dispatch. */
   _attach(source: Readable | null, contentType: string | undefined, contentLength: number | undefined): void {
@@ -68,6 +89,7 @@ export class IngeniumBody {
     this._consumed = false
     this._contentType = contentType
     this._contentLength = contentLength
+    this._cached = null
   }
 
   /** @internal Pool reset. */
@@ -76,27 +98,54 @@ export class IngeniumBody {
     this._consumed = false
     this._contentType = undefined
     this._contentLength = undefined
+    this._cached = null
   }
 
-  /** Returns the raw request body stream. Throws if already consumed. */
+  /**
+   * Returns the raw request body stream. Throws if already consumed OR
+   * if the body has already been buffered (cached) — once we hold the
+   * bytes, we can't hand the caller back a fresh Readable to own.
+   */
   stream(): Readable {
+    if (this._cached !== null) throw new IngeniumBadRequestError('Request body already consumed')
     if (this._consumed) throw new IngeniumBadRequestError('Request body already consumed')
     if (!this._source) throw new IngeniumBadRequestError('Request has no body')
     this._consumed = true
     return this._source
   }
 
-  /** Buffers the entire body into a `Buffer`. Honors `maxBytes` (default 100KB). */
+  /**
+   * Buffers the entire body into a `Buffer`. Honors `maxBytes` (default 100KB).
+   *
+   * If the body has already been buffered once (by any prior `buffer()`,
+   * `text()`, `json()`, or `urlencoded()` call), returns the cached bytes
+   * — `maxBytes` is still enforced against `cached.length`, so a caller
+   * passing a tighter cap than the original still gets a 413.
+   */
   async buffer(maxBytes: number = DEFAULT_MAX_BYTES): Promise<Buffer> {
+    // Cached path: reuse bytes, but honor the caller's ceiling.
+    if (this._cached !== null) {
+      if (this._cached.length > maxBytes) {
+        throw new IngeniumPayloadTooLargeError(
+          `Request body exceeded ${maxBytes} bytes`,
+        )
+      }
+      return this._cached
+    }
     if (this._consumed) throw new IngeniumBadRequestError('Request body already consumed')
-    if (!this._source) return Buffer.alloc(0)
+    if (!this._source) {
+      // Empty body — cache the empty buffer so subsequent consumers
+      // also hit the cached path (consistent semantics).
+      this._cached = Buffer.alloc(0)
+      return this._cached
+    }
     this._consumed = true
 
     const cl = this._contentLength
     if (cl !== undefined && cl > maxBytes) {
       // Drain source so the connection can be reused.
       this._source.resume()
-      throw new (await import('../errors.ts')).IngeniumPayloadTooLargeError(
+      throw new IngeniumPayloadTooLargeError(
         `Request body exceeded ${maxBytes} bytes`,
       )
     }
@@ -129,7 +178,11 @@ export class IngeniumBody {
         source.on('end', () => {
           // If the client truncated, return the partial buffer (matches the
           // chunks-then-concat path's behavior pre-optimization).
-          resolve(offset === cl ? buf : buf.subarray(0, offset))
+          const result = offset === cl ? buf : buf.subarray(0, offset)
+          // Cache before resolving so a follow-up consumer that awaits this
+          // same promise can read `_cached` immediately after.
+          this._cached = result
+          resolve(result)
         })
         source.on('error', reject)
       })
@@ -141,7 +194,11 @@ export class IngeniumBody {
     const chunks: Buffer[] = []
     return new Promise<Buffer>((resolve, reject) => {
       limited.on('data', (chunk: Buffer) => chunks.push(chunk))
-      limited.on('end', () => resolve(Buffer.concat(chunks)))
+      limited.on('end', () => {
+        const result = Buffer.concat(chunks)
+        this._cached = result
+        resolve(result)
+      })
       limited.on('error', reject)
     })
   }
@@ -238,8 +295,22 @@ export class IngeniumBody {
    * - Malformed body → `IngeniumBadRequestError`
    */
   async multipart(opts: MultipartOptions = {}): Promise<MultipartResult> {
+    // Multipart opts out of the buffer cache. Unlike json/text/urlencoded —
+    // which all return idempotent decodings of the same bytes — multipart's
+    // result is bespoke (file parts, field limits, mime allow-lists), and
+    // re-parsing the same bytes under different `opts` would silently return
+    // a different shape. Safer to treat multipart as a terminal consumer:
+    // it runs once, then any further body access throws.
+    //
+    // To enforce that, we either consume the live stream (first call) or
+    // read the cached buffer (someone called .text()/.json() first), then
+    // immediately invalidate both — clearing `_cached` and setting
+    // `_consumed = true` so subsequent .json()/.text()/.multipart()/.stream()
+    // calls throw "already consumed".
     const contentType = this._contentType
     const buf = await this.buffer(opts.maxBytes ?? DEFAULT_MAX_BYTES)
+    this._cached = null
+    this._consumed = true
     try {
       return parseMultipart(buf, contentType, opts)
     } catch (err) {

@@ -21,6 +21,27 @@ import {
   IngeniumValidationError,
 } from '../errors.ts'
 
+/**
+ * Dev-mode gate. Captured ONCE at module load; in production V8 dead-code-
+ * eliminates the branch bodies behind `if (IS_DEV)`. Every dev diagnostic
+ * MUST check this first so it pays nothing on the hot path.
+ */
+const IS_DEV = process.env.NODE_ENV !== 'production'
+
+/**
+ * @internal Test-only flag for the trust-proxy / XFF mismatch warning. Once
+ * per process — read-once UX. Exposed via `_resetFootgunWarnings()` for tests.
+ */
+let _trustProxyWarned = false
+
+/**
+ * @internal Test-only reset hook. Clears all module-scoped once-flags used by
+ * the dev footgun warnings. Not part of the public API.
+ */
+export function _resetFootgunWarnings(): void {
+  _trustProxyWarned = false
+}
+
 /** CR/LF detector for header-injection guard. Tested against names + values. */
 const CRLF_RE = /[\r\n]/
 
@@ -285,6 +306,23 @@ export class IngeniumContext<Params = Record<string, string>> {
         this.headers as Record<string, string | string[] | undefined>,
         this.baseProtocol,
       )
+      // Dev-only — warn once per process when the user reads forwarded info
+      // with trustProxy disabled BUT the request carries X-Forwarded-For.
+      // Almost always means the user is behind a proxy and forgot to enable
+      // trustProxy, so `ctx.ip` is silently returning the proxy's address.
+      if (IS_DEV && !_trustProxyWarned && this._trustProxy === false) {
+        if (this.headers['x-forwarded-for'] !== undefined) {
+          _trustProxyWarned = true
+          try {
+            process.emitWarning(
+              "Read ctx.ip with trustProxy disabled, but request has X-Forwarded-For. Set 'trustProxy' on the app if behind a reverse proxy.",
+              { type: 'IngeniumTrustProxyWarning' },
+            )
+          } catch {
+            // process.emitWarning can throw in unusual runtimes (workers); swallow.
+          }
+        }
+      }
     }
     return this._forwarded
   }
@@ -333,6 +371,24 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   // ───── Response helpers ────────────────────────────────────────────────
 
+  /**
+   * @internal Dev-only — emit `IngeniumDoubleWriteWarning` when a writer is
+   * called after `_written` is already true. No-op in production: V8
+   * eliminates the branch body behind the `IS_DEV` gate.
+   */
+  private _warnDoubleWrite(method: string): void {
+    if (!IS_DEV) return
+    if (!this._written) return
+    try {
+      process.emitWarning(
+        `ctx.${method}() called after response was already written. Second call overrides the first; use 'return' to short-circuit.`,
+        { type: 'IngeniumDoubleWriteWarning' },
+      )
+    } catch {
+      // process.emitWarning can throw in unusual runtimes (workers); swallow.
+    }
+  }
+
   /** Set the HTTP status code. Returns `this` for chaining. */
   status(code: number): this {
     this._statusCode = code
@@ -370,6 +426,7 @@ export class IngeniumContext<Params = Record<string, string>> {
    * framework error boundary instead of a deep `TypeError`.
    */
   json(body: unknown, status?: number): void {
+    this._warnDoubleWrite('json')
     const data = strictStringify(body)
     if (status !== undefined) this._statusCode = status
     if (!this._headers['content-type']) this._headers['content-type'] = 'application/json; charset=utf-8'
@@ -379,6 +436,7 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   /** Send a `text/plain` response. */
   text(body: string, status?: number): void {
+    this._warnDoubleWrite('text')
     if (status !== undefined) this._statusCode = status
     if (!this._headers['content-type']) this._headers['content-type'] = 'text/plain; charset=utf-8'
     this._body = { kind: 'string', data: body }
@@ -387,6 +445,7 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   /** Send a `text/html` response. */
   html(body: string, status?: number): void {
+    this._warnDoubleWrite('html')
     if (status !== undefined) this._statusCode = status
     if (!this._headers['content-type']) this._headers['content-type'] = 'text/html; charset=utf-8'
     this._body = { kind: 'string', data: body }
@@ -395,6 +454,7 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   /** Send a redirect (default 302). */
   redirect(location: string, status = 302): void {
+    this._warnDoubleWrite('redirect')
     this._statusCode = status
     this._headers.location = location
     this._body = { kind: 'none' }
@@ -403,6 +463,7 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   /** Stream a `Readable` to the client. Sets content-type if not already set. */
   stream(readable: Readable, contentType?: string): void {
+    this._warnDoubleWrite('stream')
     if (contentType && !this._headers['content-type']) this._headers['content-type'] = contentType
     this._body = { kind: 'stream', data: readable }
     this._written = true
@@ -432,6 +493,7 @@ export class IngeniumContext<Params = Record<string, string>> {
 
   /** Send a `Buffer` body verbatim. */
   send(body: Buffer | string, status?: number): void {
+    this._warnDoubleWrite('send')
     if (status !== undefined) this._statusCode = status
     if (typeof body === 'string') {
       if (!this._headers['content-type']) this._headers['content-type'] = 'text/plain; charset=utf-8'
