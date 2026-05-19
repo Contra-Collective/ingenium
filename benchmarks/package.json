@@ -20,7 +20,7 @@
     "autocannon": "^7.15.0",
     "express": "^4.21.0",
     "fastify": "^5.0.0",
-    "hono": "^4.6.0",
+    "hono": "^4.12.21",
     "ingenium": "*",
     "tinybench": "^3.0.0"
   },
