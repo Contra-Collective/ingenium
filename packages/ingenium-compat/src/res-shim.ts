@@ -1,170 +1,262 @@
+import { Writable } from 'node:stream'
+import { EventEmitter } from 'node:events'
 import { Buffer } from 'node:buffer'
 import type { IngeniumContext } from 'ingenium'
 
 /**
- * Minimal ServerResponse-like surface used by cors / helmet / morgan /
- * compression. Mutates the underlying IngeniumContext's response state directly
- * so that whether the middleware writes the response or just sets headers,
- * the changes land where the framework expects them.
+ * A real `stream.Writable` (hence a real `EventEmitter`) presenting an
+ * Express/`ServerResponse`-style response surface over a `IngeniumContext`.
+ *
+ * Why a real Writable (vs the old plain-object shim): the middleware that the
+ * old shim couldn't support all need genuine stream/emitter behavior —
+ *
+ *   - `compression` reassigns `res.write`/`res.end` to interpose a gzip
+ *     stream, then calls the originals. On a plain object the patched
+ *     functions were never invoked (the old shim even trapped the assignment
+ *     and threw). Here the originals are real `Writable` methods, so the
+ *     gzipped bytes flow through `_write` into the buffer.
+ *   - `express-session` defers `Set-Cookie` to header-commit time via
+ *     `on-headers` (which patches `res.writeHead`) and saves on `res.end`.
+ *   - `morgan` logs its end-of-request tokens from `res.on('finish')`.
+ *
+ * Headers + status are proxied LIVE to the context (so header-only middleware
+ * like `cors`/`helmet` that never end the response still land their headers,
+ * and `removeHeader` works). Only the response BODY is buffered, and only when
+ * the middleware actually writes one — flushed into `ctx._body` on `_final`,
+ * just before `'finish'` fires.
  */
-export interface IngeniumResShim {
-  headersSent: boolean
-  finished: boolean
-  statusCode: number
-  status(code: number): IngeniumResShim
-  setHeader(name: string, value: string | string[] | number): IngeniumResShim
-  getHeader(name: string): string | string[] | undefined
-  removeHeader(name: string): void
-  writeHead(code: number, headers?: Record<string, string | string[] | number>): IngeniumResShim
-  json(body: unknown): IngeniumResShim
-  send(body: unknown): IngeniumResShim
-  end(chunk?: string | Buffer, encoding?: BufferEncoding): IngeniumResShim
-  /** @internal — true once a terminal write happened. */
-  _ended: boolean
+export class IngeniumResShim extends Writable {
+  headersSent = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  req: any = undefined
+  // A real EventEmitter socket: `on-finished`/`on-headers` (used by morgan,
+  // express-session, compression) attach 'error'/'close' listeners to it.
+  socket: EventEmitter & { writable: boolean; remoteAddress: string }
+
+  constructor(ctx: IngeniumContext) {
+    // decodeStrings:true (default) means `_write` always receives Buffers.
+    super()
+    RES_CTX.set(this, ctx)
+    this.socket = Object.assign(new EventEmitter(), {
+      writable: true,
+      remoteAddress: ctx.remoteAddress,
+    })
+  }
+
+  // ───── Status (proxied live to the context) ────────────────────────────
+
+  get statusCode(): number {
+    return RES_CTX.get(this)!._statusCode
+  }
+  set statusCode(code: number) {
+    RES_CTX.get(this)!._statusCode = code
+  }
+
+  /** Express-style chainable status setter. */
+  status(code: number): this {
+    RES_CTX.get(this)!._statusCode = code
+    return this
+  }
+
+  sendStatus(code: number): this {
+    RES_CTX.get(this)!._statusCode = code
+    return this.end(String(code)) as unknown as this
+  }
+
+  // ───── Headers (proxied live to the context) ───────────────────────────
+
+  setHeader(name: string, value: string | string[] | number): this {
+    const headers = RES_CTX.get(this)!._headers
+    headers[name.toLowerCase()] = Array.isArray(value)
+      ? value
+      : typeof value === 'number'
+        ? String(value)
+        : value
+    return this
+  }
+
+  /** Express alias for `setHeader`, with object form. */
+  set(name: string | Record<string, string | string[] | number>, value?: string | string[] | number): this {
+    if (typeof name === 'object') {
+      for (const k of Object.keys(name)) {
+        const v = name[k]
+        if (v !== undefined) this.setHeader(k, v)
+      }
+      return this
+    }
+    return this.setHeader(name, value as string | string[] | number)
+  }
+
+  header(name: string, value: string | string[] | number): this {
+    return this.setHeader(name, value)
+  }
+
+  getHeader(name: string): string | string[] | undefined {
+    return RES_CTX.get(this)!._headers[name.toLowerCase()]
+  }
+
+  /** Express alias for `getHeader`. */
+  get(name: string): string | string[] | undefined {
+    return this.getHeader(name)
+  }
+
+  getHeaderNames(): string[] {
+    return Object.keys(RES_CTX.get(this)!._headers)
+  }
+
+  getHeaders(): Record<string, string | string[]> {
+    return { ...RES_CTX.get(this)!._headers }
+  }
+
+  hasHeader(name: string): boolean {
+    return name.toLowerCase() in RES_CTX.get(this)!._headers
+  }
+
+  removeHeader(name: string): void {
+    delete RES_CTX.get(this)!._headers[name.toLowerCase()]
+  }
+
+  /** Append a value to a (possibly repeated) header, e.g. `Vary`, `Set-Cookie`. */
+  append(name: string, value: string | string[]): this {
+    const existing = this.getHeader(name)
+    if (existing === undefined) return this.setHeader(name, value)
+    const merged = (Array.isArray(existing) ? existing : [existing]).concat(value)
+    return this.setHeader(name, merged)
+  }
+
+  vary(field: string): this {
+    return this.append('vary', field)
+  }
+
+  type(contentType: string): this {
+    return this.setHeader('content-type', contentType)
+  }
+
+  /**
+   * Express-style header commit point. `on-headers` reassigns this method to
+   * run header-mutating listeners (e.g. `express-session`'s Set-Cookie) the
+   * first time it's called — so it MUST stay a normal, reassignable method.
+   * Our own `_final` calls it once if the middleware never did.
+   */
+  writeHead(
+    code: number,
+    reasonOrHeaders?: string | Record<string, string | string[] | number>,
+    headers?: Record<string, string | string[] | number>,
+  ): this {
+    const ctx = RES_CTX.get(this)!
+    ctx._statusCode = code
+    const hdrs = typeof reasonOrHeaders === 'object' ? reasonOrHeaders : headers
+    if (hdrs) {
+      for (const k of Object.keys(hdrs)) {
+        const v = hdrs[k]
+        if (v !== undefined) this.setHeader(k, v)
+      }
+    }
+    this.headersSent = true
+    return this
+  }
+
+  /**
+   * `http.ServerResponse` internal that several middleware call to force a
+   * header commit (e.g. `express-session`'s patched `end`). Real Node defines
+   * it; our shim maps it onto `writeHead`.
+   */
+  _implicitHeader(): void {
+    if (!this.headersSent) this.writeHead(this.statusCode)
+  }
+
+  // ───── Body writers ────────────────────────────────────────────────────
+  //
+  // `write`/`end` are inherited from Writable (real, reassignable — this is
+  // what lets `compression` wrap them). The Express conveniences below just
+  // set a default content-type and delegate to the (possibly patched) `end`.
+
+  json(body: unknown): this {
+    if (!this.hasHeader('content-type')) {
+      this.setHeader('content-type', 'application/json; charset=utf-8')
+    }
+    return this.end(JSON.stringify(body)) as unknown as this
+  }
+
+  send(body?: unknown): this {
+    if (body === undefined || body === null) {
+      return this.end() as unknown as this
+    }
+    if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+      return this.end(Buffer.isBuffer(body) ? body : Buffer.from(body)) as unknown as this
+    }
+    if (typeof body === 'string') {
+      if (!this.hasHeader('content-type')) {
+        this.setHeader('content-type', 'text/html; charset=utf-8')
+      }
+      return this.end(body) as unknown as this
+    }
+    return this.json(body)
+  }
+
+  redirect(statusOrUrl: number | string, url?: string): this {
+    let status = 302
+    let location: string
+    if (typeof statusOrUrl === 'number') {
+      status = statusOrUrl
+      location = url ?? ''
+    } else {
+      location = statusOrUrl
+    }
+    const ctx = RES_CTX.get(this)!
+    ctx._statusCode = status
+    this.setHeader('location', location)
+    return this.end() as unknown as this
+  }
+
+  // ───── Buffering → context flush ───────────────────────────────────────
+
+  override _write(chunk: Buffer, _enc: BufferEncoding, cb: (err?: Error | null) => void): void {
+    chunksFor(this).push(chunk)
+    cb()
+  }
+
+  override _final(cb: (err?: Error | null) => void): void {
+    // Commit headers if nobody did — this runs any `on-headers` listeners
+    // (e.g. express-session's Set-Cookie, compression's Content-Encoding
+    // decision) before we read `ctx._headers` to ship.
+    if (!this.headersSent) this.writeHead(this.statusCode)
+
+    const ctx = RES_CTX.get(this)!
+    const chunks = chunksFor(this)
+    if (chunks.length === 0) {
+      ctx._body = { kind: 'none' }
+    } else {
+      ctx._body = { kind: 'buffer', data: Buffer.concat(chunks) }
+    }
+    ctx._written = true
+    cb()
+  }
+
+  /** Legacy `res.finished` flag some middleware still read. */
+  get finished(): boolean {
+    return this.writableEnded
+  }
+}
+
+// Free-form surface: middleware adds props (`res.flush`, `res.locals`, …) and
+// reads arbitrary keys. Declaration-merged so callers stay typed without an
+// in-class index signature (which esbuild rejects).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface IngeniumResShim { [key: string]: any }
+
+const RES_CTX = new WeakMap<IngeniumResShim, IngeniumContext>()
+const RES_CHUNKS = new WeakMap<IngeniumResShim, Buffer[]>()
+
+function chunksFor(res: IngeniumResShim): Buffer[] {
+  let chunks = RES_CHUNKS.get(res)
+  if (!chunks) {
+    chunks = []
+    RES_CHUNKS.set(res, chunks)
+  }
+  return chunks
 }
 
 export function createResShim(ctx: IngeniumContext): IngeniumResShim {
-  // `any` allowed inside this shim: Express's ServerResponse signatures are
-  // wildly polymorphic and we only model the subset the target middlewares hit.
-  const res: IngeniumResShim = {
-    headersSent: false,
-    finished: false,
-
-    get statusCode(): number {
-      return ctx._statusCode
-    },
-    set statusCode(code: number) {
-      ctx._statusCode = code
-    },
-
-    status(code: number): IngeniumResShim {
-      ctx._statusCode = code
-      return res
-    },
-
-    setHeader(name: string, value: string | string[] | number): IngeniumResShim {
-      ctx._headers[name.toLowerCase()] = typeof value === 'number' ? String(value) : value
-      return res
-    },
-
-    getHeader(name: string): string | string[] | undefined {
-      return ctx._headers[name.toLowerCase()]
-    },
-
-    removeHeader(name: string): void {
-      delete ctx._headers[name.toLowerCase()]
-    },
-
-    writeHead(code: number, headers?: Record<string, string | string[] | number>): IngeniumResShim {
-      ctx._statusCode = code
-      if (headers) {
-        for (const k of Object.keys(headers)) {
-          const v = headers[k]
-          if (v === undefined) continue
-          ctx._headers[k.toLowerCase()] = typeof v === 'number' ? String(v) : v
-        }
-      }
-      res.headersSent = true
-      return res
-    },
-
-    json(body: unknown): IngeniumResShim {
-      ctx.json(body)
-      res.headersSent = true
-      res.finished = true
-      res._ended = true
-      return res
-    },
-
-    send(body: unknown): IngeniumResShim {
-      if (body === undefined || body === null) {
-        ctx._body = { kind: 'none' }
-        ctx._written = true
-      } else if (Buffer.isBuffer(body)) {
-        ctx.send(body)
-      } else if (typeof body === 'string') {
-        ctx.text(body)
-      } else if (body instanceof Uint8Array) {
-        ctx.send(Buffer.from(body))
-      } else {
-        ctx.json(body)
-      }
-      res.headersSent = true
-      res.finished = true
-      res._ended = true
-      return res
-    },
-
-    end(chunk?: string | Buffer, _encoding?: BufferEncoding): IngeniumResShim {
-      if (chunk !== undefined) {
-        if (typeof chunk === 'string') {
-          ctx._body = { kind: 'string', data: chunk }
-        } else {
-          ctx._body = { kind: 'buffer', data: chunk }
-        }
-        ctx._written = true
-      } else if (!ctx._written) {
-        // No body, but mark written so the chain stops.
-        ctx._body = { kind: 'none' }
-        ctx._written = true
-      }
-      res.headersSent = true
-      res.finished = true
-      res._ended = true
-      return res
-    },
-
-    _ended: false,
-  }
-
-  // ───── Loud failure for monkey-patch attempts (write / pipe / end) ─────
-  //
-  // `compression` and `express-session` work by REASSIGNING res.write or
-  // res.end to a wrapped function — `res.write = (chunk) => { gzip... }`.
-  // On a real http.ServerResponse the wrap is invisible and works; on this
-  // plain-object shim the patch lands but is never invoked, so the response
-  // ships unmodified and the user gets a silent failure.
-  //
-  // We trap the WRITE side of those properties only — reads return existing
-  // values (so feature-detection like `typeof res.write === 'function'` still
-  // returns undefined cleanly, matching current behavior). Doing it on assign
-  // means cors/helmet/morgan are completely unaffected — they never assign to
-  // these. Cost on the hot path is zero: this only runs at shim-creation
-  // time, and only fires when a broken middleware tries to patch.
-  for (const member of ['write', 'pipe'] as const) {
-    Object.defineProperty(res, member, {
-      configurable: true,
-      enumerable: false,
-      get(): undefined { return undefined },
-      set(): void {
-        throw new TypeError(
-          `expressCompat(): the wrapped middleware tried to monkey-patch ` +
-          `\`res.${member}\`. The response shim is a plain object, not a real ` +
-          `http.ServerResponse, so the patched function would never be invoked ` +
-          `and the response would ship unmodified. This is how \`compression\` ` +
-          `and a few session libraries fail silently. ` +
-          `Use a Ingenium-native equivalent (or terminate gzip at the proxy). ` +
-          `See packages/ingenium-compat/COMPATIBILITY.md.`,
-        )
-      },
-    })
-  }
-  // `end` already exists as a method on the shim; trap reassignment without
-  // breaking the existing call site.
-  const originalEnd = res.end
-  Object.defineProperty(res, 'end', {
-    configurable: true,
-    enumerable: true,
-    get(): typeof originalEnd { return originalEnd },
-    set(): void {
-      throw new TypeError(
-        `expressCompat(): the wrapped middleware tried to monkey-patch \`res.end\`. ` +
-        `The shim's end() flushes the response synchronously to the IngeniumContext; ` +
-        `a replacement function would never see those bytes. ` +
-        `See packages/ingenium-compat/COMPATIBILITY.md.`,
-      )
-    },
-  })
-
-  return res
+  return new IngeniumResShim(ctx)
 }

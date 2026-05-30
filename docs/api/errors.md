@@ -148,4 +148,3 @@ These warnings are non-fatal; the request continues. They surface as warnings (n
 Hard misuse — situations where the framework can't safely continue — throws instead:
 
 - `app.listen()` on an app that's already listening throws `TypeError("app.listen(): this app is already listening...")`. Close the existing server first.
-- `expressCompat(knownBroken)` throws at registration time for the four broken middleware (`multer`, `express-session`, `compression`, `body-parser`) — opt out with `{ allowKnownBroken: true }` to get a warning instead.

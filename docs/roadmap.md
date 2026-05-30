@@ -32,7 +32,7 @@
 - Path syntax with `:param`, `:param?`, `*wild`, deterministic precedence (static > param > wildcard).
 - Error class hierarchy (`IngeniumError` and friends) with default JSON error boundary; `app.onError` override + re-throw delegation.
 - Standard Schema v1 integration in `ctx.body.json(schema)` and `ctx.query.parse(schema)` (alongside Zod-style `safeParse` and duck-typed `{ parse }`).
-- Express compat shim (`expressCompat`) for pure-function middleware (cors, helmet, etc.); detect-and-throw on known-broken (`multer`, `express-session`, `compression`, `body-parser`).
+- Express compat shim (`expressCompat`) — real-stream `req`/`res` shims; `(req, res, next)` middleware is a genuine drop-in (cors, helmet, body-parser, multer, compression, express-session, morgan, express-rate-limit).
 - Node HTTP adapter with `app.listen(port, host?)` returning `{ port, close }`.
 - Bun adapter (`ingenium-bun`) — `BunAdapter` transport for `Bun.serve()` sharing the same `app.handle(ctx)` dispatch entry, with a Web-Streams ↔ `node:stream` bridge.
 - HTTP/2 (h2) + HTTP/2 cleartext (h2c) transports.
@@ -63,7 +63,6 @@ during development, not marketing material.
 
 ## Known issues — gaps
 
-- **Compat shim long-tail beyond the known-broken list** — middleware that own `res.end` outside the four detected ones (`multer`, `express-session`, `compression`, `body-parser`) silently misbehave. Workaround: use the native equivalents.
 - **No per-route OpenAPI inline schema yet** — schemas live in a separate `app.describe(...)` call instead of `app.get('/path', { response: Schema }, handler)`. Tracked for 0.1.0.
 
 ---
