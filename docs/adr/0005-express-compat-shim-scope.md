@@ -1,7 +1,31 @@
 # ADR 0005: Express compatibility shim — what's in, what's out
 
 ## Status
-Accepted (2026-05-12)
+Accepted (2026-05-12). **Amended 2026-05-29** — see "Amendment" below.
+
+## Amendment (2026-05-29): real-stream shims widen the "in" set
+The original decision drew the line at *stateless wrappers* and pushed
+body-reading / response-owning middleware (`multer`, `body-parser`,
+`compression`, `express-session`) to native ports, because the shim's
+`req`/`res` were plain objects that couldn't proxy stream or
+response-lifecycle behavior.
+
+The shim has since been reimplemented on **real Node streams**: `req`
+extends `stream.Readable` (lazy body) and `res` extends `stream.Writable`
+(a real `EventEmitter`, headers/status proxied live, body buffered and
+flushed on `finish`). When a middleware patches `res.write`/`res.end`, the
+downstream response is replayed through `res` so the patch takes effect.
+This removes the technical blocker for the previously-excluded set:
+`body-parser`, `multer`, `compression`, `express-session`, plus full
+`morgan` and `express-rate-limit`, now work end-to-end (validated in the
+compat e2e suite).
+
+What's unchanged: this is still a **middleware** shim, not a goal to run
+whole Express apps unmodified — routing, `app.set(...)`, `Layer`/`Route`
+internals, and `res.locals`-style leakage remain out of scope, and the
+native primitives (`ctx.body.*`, `sessionMiddleware`, native cors/csrf/
+rate-limit) remain the recommended path for new code. The "Decision" and
+"Consequences" below record the original, narrower scope for history.
 
 ## Context
 Ingenium's pitch is "Express ergonomics, modern internals". A real

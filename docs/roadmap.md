@@ -9,7 +9,7 @@
 - Handler return-value reflection (object → JSON, string → text/html, `Buffer` → octet-stream, `Readable` → stream, `undefined` → 204).
 - Path syntax with `:param`, `:param?`, `*wild`, deterministic precedence (static > param > wildcard).
 - Error class hierarchy (`IngeniumError` and friends) with default JSON error boundary; `app.onError` override + re-throw delegation.
-- Express compat shim (`expressCompat`) for pure-function middleware (cors, helmet, etc.).
+- Express compat shim (`expressCompat`) — real-stream `req`/`res` shims; `(req, res, next)` middleware is a genuine drop-in (cors, helmet, body-parser, multer, compression, express-session, morgan, express-rate-limit).
 - Node HTTP adapter with `app.listen(port, host?)` returning `{ port, close }`.
 - **Bun adapter** (`ingenium-bun`) — `BunAdapter` transport for `Bun.serve()` sharing the same `app.handle(ctx)` dispatch entry, with a Web-Streams ↔ `node:stream` bridge.
 - **Plugin system** — `app.register(plugin, opts?)` with lifecycle hooks (`onRoute`, `onCompose`, `onRequest`, `onResponse`, `onError`) and per-request decorators (`app.decorate` lazy, `app.decorateRequest` eager). Hot path short-circuits when nothing is registered.
@@ -46,11 +46,11 @@ Extend `ExtractParams<Path>` to recognize numeric / regex / enum constraints in 
 
 ### Native multipart / file upload
 
-A `ctx.body.multipart()` API so `multer`-shaped use cases stop needing a hand-rolled parser. The compat shim can't proxy `multer` because it owns the request stream; this needs to be native.
+A `ctx.body.multipart()` API so `multer`-shaped use cases stop needing a hand-rolled parser. `multer` now also works through the compat shim (the `req` shim is a real `Readable`), but the native API avoids the shim and integrates with `IngeniumBody`'s streaming model.
 
 ### Native rate-limit + session helpers
 
-`express-rate-limit`, `express-session`, and `csurf` all hook the Express response lifecycle in ways the compat shim can't proxy. v0.1 should ship minimal native equivalents (or a documented integration path) so users aren't forced to drop down to the raw transport.
+`express-rate-limit` and `express-session` now work through the compat shim (the `res` shim is a real `Writable`/`EventEmitter` that honors the `on-headers` / save-on-`end` lifecycle). Native equivalents are still preferred for new code — tighter integration, no shim — so v0.1 should ship first-class rate-limit / session / CSRF helpers (the native ones already exist; this tracks parity + docs).
 
 ---
 

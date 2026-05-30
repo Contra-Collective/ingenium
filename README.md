@@ -114,7 +114,7 @@ Native primitives an API team actually needs in prod, all opt-in:
 | Header injection guard | `ctx.set(name, value)` rejects `\r\n` immediately → `IngeniumHeaderInjectionError` | Catches CRLF injection at the call site instead of deep inside Node's wire path. |
 | `ctx.json()` safety on circular refs / BigInt | Throws `IngeniumUnserializableError` (500) with the structural reason | No more useless `TypeError: Converting circular...` bubbling up as a generic 500. `safeJsonStringify(value)` exported for lenient mode. |
 | Idempotency-Key — skip caching 5xx | `ingenium.idempotency({ cacheable: (s) => s < 500 })` (default) | A transient 500 no longer gets replayed for the entire TTL. |
-| Compat shim — fail-loud on broken middleware | `expressCompat(bodyParser.json())` throws `TypeError` at registration | Silent failures of `express-session`, `multer`, `body-parser`, `compression` now point at the native equivalent. Opt out via `{ allowKnownBroken: true }`. |
+| Compat shim — real-stream Express drop-in | `expressCompat(mw)` runs `(req, res, next)` middleware on real Node streams (`req` is a `Readable`, `res` a `Writable`) | `body-parser`, `multer`, `compression`, `express-session`, `morgan` all work end-to-end; cost is opt-in per wrapped middleware. |
 | Asymmetric JWT (RS/PS/ES + JWKS) | `ingenium.jwt({ algorithms: ['RS256'], jwksUrl: '...' })` | Required for any IdP with a JWKS endpoint (Auth0, Okta, Cognito, Clerk, Supabase). Algorithm-confusion attacks blocked at the allowlist. `'none'` rejected unconditionally. |
 | Late-write protection | `_epoch` counter on `IngeniumContext` — orphaned-handler writes after a timeout are detected and discarded | Stops cross-request response corruption when the pool recycles the context. |
 
@@ -685,7 +685,7 @@ app.use(expressCompat(cors({ origin: 'https://app.example.com' })))
 app.use(expressCompat(helmet()))
 ```
 
-The shim wraps `(req, res, next)` middleware so it can run inside an Ingenium middleware chain. The `req` and `res` shims expose enough surface for header-stamping, cookie parsing, simple body work, and short-circuit responses.
+The shim wraps `(req, res, next)` middleware so it can run inside an Ingenium middleware chain. The shims are **real Node streams** — `req` extends `stream.Readable`, `res` extends `stream.Writable` (a real `EventEmitter`) — wired to the `IngeniumContext`, so body-reading and response-transforming middleware are genuine drop-ins. Header/status proxy live to the context and the request body is lazy, so header-only middleware pay near-zero overhead.
 
 **Compatibility status** (validated end-to-end in `packages/ingenium-compat/test/e2e.test.ts`):
 
@@ -693,16 +693,17 @@ The shim wraps `(req, res, next)` middleware so it can run inside an Ingenium mi
 |---|---|---|
 | `cors` | supported | full feature parity |
 | `helmet` | supported | full feature parity |
-| `cookie-parser` | supported | `req.cookies` populated, mirrored to `ctx.state` |
-| `passport.initialize` | supported | `passport.authenticate` is partial (depends on session) |
-| `morgan` | partial | logging works; `:response-time` token may be inaccurate |
-| `express-rate-limit` | partial | works with `validate: false` and a custom `keyGenerator` |
-| `compression` | unsupported | needs `res.write`/`res.end` ownership the shim doesn't proxy — use a reverse proxy |
-| `body-parser` | unsupported | use native `ctx.body.json()` / `ctx.body.urlencoded()` |
-| `express-session` | unsupported | silently no-ops — use native `sessionMiddleware` |
-| `multer` | unsupported | owns the request stream — use native `ctx.body.multipart()` |
+| `cookie-parser` | supported | `req.cookies` populated, mirrored to `ctx.state.cookies` |
+| `morgan` | supported | end-of-request tokens (`:status`, `:response-time`) fire on `res` `finish` |
+| `express-rate-limit` | supported | `req.ip` populated — no custom `keyGenerator` needed |
+| `compression` | supported | downstream response replayed through the patched `res`; body gzipped, `Content-Encoding` set |
+| `body-parser` | supported | reads the real request stream; `req.body` → `ctx.state.body` |
+| `passport.initialize` | supported | `req._passport` propagates to `ctx.state` |
+| `passport.authenticate` | partial | `res.redirect`/cookie writes work; session-backed strategies need a session store |
+| `express-session` | supported | `Set-Cookie` via `on-headers` + save on `res.end` |
+| `multer` | supported | `req.pipe(busboy)` works; `req.file` → `ctx.state` |
 
-Full matrix and failure modes in [`packages/ingenium-compat/COMPATIBILITY.md`](packages/ingenium-compat/COMPATIBILITY.md).
+Full matrix and internals in [`packages/ingenium-compat/COMPATIBILITY.md`](packages/ingenium-compat/COMPATIBILITY.md).
 
 ---
 
@@ -884,7 +885,6 @@ See [docs/roadmap.md](docs/roadmap.md) for the full breakdown. Highlights:
 - CI matrix, ADRs, reference app, governance bundle
 
 **Known issues:**
-- Compat shim long-tail: middleware that own `res.end` (compression, express-session) silently misbehave — documented but worth surfacing better
 - `ctx.query.parse(schema)` doesn't exist yet — only body validation has the schema affordance
 - `ExtractParams` doesn't narrow constrained params (`:id(\\d+)` stays `string`)
 - `ctx.query.parse(schema)` mirrors `ctx.body.json(schema)` but uses a fixed coercion model — see the [Schema validation](#schema-validation) section for the trade-offs
